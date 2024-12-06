@@ -1,0 +1,233 @@
+{
+  "productosFNG": {
+    "EMP001": {
+      "nombre": "Producto Empresarial 001",
+      "plazosMinimos": 12,
+      "plazosMaximos": 60,
+      "tipoComision": "fija",
+      "comisionesPorPlazo": {
+        "12": 0.025,
+        "24": 0.0376,
+        "36": 0.0502,
+        "48": 0.0626,
+        "60": 0.0748
+      },
+      "modalidadComision": "capitalTotal"
+    },
+    "EMP319": {
+      "nombre": "Producto Empresarial 319",
+      "plazosMinimos": 2,
+      "plazosMaximos": 60,
+      "tipoComision": "variable",
+      "comisionesPorPlazo": {
+        "2": 0.0046,
+        "12": 0.0275,
+        "24": 0.0414,
+        "36": 0.0552,
+        "48": 0.0688,
+        "60": 0.0822
+      },
+      "modalidadComision": "capitalTotal"
+    },
+    "EMP023": {
+      "nombre": "Producto Empresarial 023",
+      "plazosMinimos": 2,
+      "plazosMaximos": 60,
+      "tipoComision": "variable",
+      "comisionesPorPlazo": {
+        "2": 0.0042,
+        "3": 0.0063,
+        "4": 0.0083,
+        "5": 0.0104,
+        "6": 0.0125,
+        "7": 0.0146,
+        "8": 0.0167,
+        "9": 0.0188,
+        "10": 0.0208,
+        "11": 0.0229,
+        "12": 0.025,
+        "13": 0.0252,
+        "14": 0.0256,
+        "15": 0.0263,
+        "16": 0.0271,
+        "17": 0.0281,
+        "18": 0.0292,
+        "19": 0.0304,
+        "20": 0.0317,
+        "21": 0.0331,
+        "22": 0.0346,
+        "23": 0.0361,
+        "24": 0.0376,
+        "25": 0.0382,
+        "26": 0.0389,
+        "27": 0.0397,
+        "28": 0.0406,
+        "29": 0.0416,
+        "30": 0.0426,
+        "31": 0.0438,
+        "32": 0.0449,
+        "33": 0.0462,
+        "34": 0.0475,
+        "35": 0.0488,
+        "36": 0.0502,
+        "37": 0.0509,
+        "38": 0.0517,
+        "39": 0.0526,
+        "40": 0.0535,
+        "41": 0.0545,
+        "42": 0.0555,
+        "43": 0.0566,
+        "44": 0.0577,
+        "45": 0.0589,
+        "46": 0.0601,
+        "47": 0.0613,
+        "48": 0.0626,
+        "49": 0.0634,
+        "50": 0.0642,
+        "51": 0.0651,
+        "52": 0.066,
+        "53": 0.067,
+        "54": 0.068,
+        "55": 0.0691,
+        "56": 0.0701,
+        "57": 0.0713,
+        "58": 0.0724,
+        "59": 0.0736,
+        "60": 0.0748
+      },
+      "modalidadComision": "capitalTotal"
+    },
+    "EMP231": {
+      "nombre": "Producto Empresarial 231",
+      "plazosMinimos": 2,
+      "plazosMaximos": 60,
+      "tipoComision": "variable",
+      "comisionesPorPlazo": {
+        "2": 0.0046,
+        "12": 0.0275,
+        "24": 0.0414,
+        "36": 0.0552,
+        "48": 0.0688,
+        "60": 0.0822
+      },
+      "modalidadComision": "capitalTotal"
+    },
+    "EMP280": {
+      "nombre": "Producto Empresarial 280",
+      "plazosMinimos": 12,
+      "plazosMaximos": 60,
+      "tipoComision": "fija",
+      "comisionesPorPlazo": {
+        "12": 0.025,
+        "24": 0.0376,
+        "36": 0.0502,
+        "48": 0.0626,
+        "60": 0.0748
+      },
+      "modalidadComision": "capitalTotal"
+    },
+    "EMP080": {
+      "nombre": "Producto Empresarial 080",
+      "plazosMinimos": 12,
+      "plazosMaximos": 60,
+      "tipoComision": "fija",
+      "comisionesPorPlazo": {
+        "12": 0.025,
+        "24": 0.0376,
+        "36": 0.0502,
+        "48": 0.0626,
+        "60": 0.0748
+      },
+      "modalidadComision": "capitalTotal"
+    },
+    "EMP320": {
+      "nombre": "Producto Empresarial 320",
+      "tipoComision": "saldoPendiente",
+      "tasaComisionMensual": 0.0016,
+      "modalidadComision": "saldoMensual"
+    },
+    "EMP300": {
+      "nombre": "Producto Empresarial 300",
+      "tipoComision": "saldoPendiente",
+      "tasaComisionMensual": 0.004,
+      "modalidadComision": "saldoMensual"
+    },
+    "EMP200": {
+      "nombre": "Producto Empresarial 200",
+      "tipoComision": "saldoPendiente",
+      "tasaComisionMensual": 0.0029,
+      "modalidadComision": "saldoMensual"
+    }
+  },
+  "tasasInteresRural": [
+    { "min": 1000000, "max": 3000000, "ea": 0.69, "nmv": 0.5364, "mv": 0.0447 },
+    { "min": 3000001, "max": 5000000, "ea": 0.68, "nmv": 0.5302, "mv": 0.0442 },
+    { "min": 5000001, "max": 7800000, "ea": 0.68, "nmv": 0.5302, "mv": 0.0442 },
+    {
+      "min": 7800001,
+      "max": 15600000,
+      "ea": 0.2478,
+      "nmv": 0.2234,
+      "mv": 0.0186
+    },
+    {
+      "min": 15600001,
+      "max": 32500000,
+      "ea": 0.2478,
+      "nmv": 0.2234,
+      "mv": 0.0186
+    },
+    {
+      "min": 32500001,
+      "max": 156000000,
+      "ea": 0.3998,
+      "nmv": 0.3411,
+      "mv": 0.0284
+    }
+  ],
+  "tasasInteresUrbano": [
+    { "min": 1000000, "max": 3000000, "ea": 0.73, "nmv": 0.5608, "mv": 0.0467 },
+    { "min": 3000001, "max": 5000000, "ea": 0.7, "nmv": 0.5425, "mv": 0.0452 },
+    { "min": 5000001, "max": 7800000, "ea": 0.7, "nmv": 0.5425, "mv": 0.0452 },
+    {
+      "min": 7800001,
+      "max": 15600000,
+      "ea": 0.534,
+      "nmv": 0.4356,
+      "mv": 0.0363
+    },
+    {
+      "min": 15600001,
+      "max": 32500000,
+      "ea": 0.534,
+      "nmv": 0.4356,
+      "mv": 0.0363
+    },
+    {
+      "min": 32500001,
+      "max": 156000000,
+      "ea": 0.3998,
+      "nmv": 0.3411,
+      "mv": 0.0284
+    }
+  ],
+  "leyMipyme": [
+    { "min": 1000000, "max": 15600000, "comision": 0.075 },
+    { "min": 15600001, "max": 32500000, "comision": 0.045 }
+  ],
+  "configuracionGeneral": {
+    "seguroVida": {
+      "tasaPorMil": 0.8
+    },
+    "plazoMinimo": 6,
+    "montoMinimo": 1000000,
+    "montoMaximo": 156000000,
+    "modalidadesPago": {
+      "Mensual": 1,
+      "Bimensual": 2,
+      "Trimestral": 3,
+      "Cuatrimestral": 4,
+      "Semestral": 6
+    }
+  }
+}
