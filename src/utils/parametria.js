@@ -1,90 +1,182 @@
 // src/utils/parametria.js
 
-// Importamos el archivo de parametría
+// utils/parametria.js
+
 import parametria from "../data/parametria.json";
 
 export const getParametria = () => {
   return parametria;
 };
 
-// Función para determinar tipo de crédito según monto en SMLV
-export const determinarTipoCredito = (monto, modalidad) => {
+// Función para calcular equivalencia en SMLV
+const calcularSMLV = (monto) => {
   const SMLV = parametria.configuracionGeneral.salarioMinimo;
-
-  if (modalidad === "MICROCREDITO") {
-    const montoEnSMLV = monto / SMLV;
-    const rangos = parametria.rangosTipoCredito.MICROCREDITO;
-
-    if (montoEnSMLV <= 6) return "POPULAR";
-    if (montoEnSMLV <= 25) return "PRODUCTIVO";
-    return "PRODUCTIVO_MAYOR_MONTO";
-  }
-
-  return modalidad;
+  return monto / SMLV;
 };
 
-// Función para validar si una cédula puede acceder a fondos especiales
+// Función para determinar tipo de crédito según monto
+export const determinarTipoCredito = (monto, modalidad, zona = "") => {
+  if (!monto || !modalidad) return 0;
+
+  const montoEnSMLV = calcularSMLV(monto);
+
+  // Determinar tipo según modalidad
+  switch (modalidad) {
+    case "MICROCREDITO":
+      if (montoEnSMLV <= 6) return `POPULAR_${zona.toUpperCase()}`;
+      if (montoEnSMLV <= 25) return `PRODUCTIVO_${zona.toUpperCase()}`;
+      if (montoEnSMLV > 25) return "PRODUCTIVO_MAYOR_MONTO";
+      break;
+    case "COMERCIAL":
+      return "COMERCIAL";
+    case "CONSUMO":
+      return "CONSUMO";
+    case "VEHICULO":
+      return "VEHICULO";
+    case "LEY_DE_VICTIMAS":
+      return "CONSUMO";
+    default:
+      return 0;
+  }
+};
+
+// Función para validar cédula para fondos especiales
 export const validarCedulaFondoEspecial = (cedula) => {
+  if (!cedula || !parametria.cedulasPermitidas) return 0;
+
   const { cedulasPermitidas } = parametria;
   const fechaActual = new Date();
   const fechaVigencia = new Date(cedulasPermitidas.vigenciaHasta);
 
+  // Validar vigencia
   if (fechaActual > fechaVigencia) {
-    return null;
+    return { error: "La vigencia del fondo ha expirado" };
   }
 
-  return cedulasPermitidas.cedulas[cedula] || null;
+  // Validar si la cédula existe
+  const fondoAsignado = cedulasPermitidas.cedulas[cedula];
+  return fondoAsignado || { error: "Cédula no autorizada" };
 };
 
-// Función para obtener tasa de interés según configuración
+// Función para obtener tasa de interés
 export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
-  const tasas = parametria.tasasInteres[modalidad];
-  if (!tasas) return null;
+  if (!monto || !modalidad || !tipoCredito || !zona) return 0;
 
-  const rangos = tasas.rangos.find((rango) => {
-    const montoAplica =
+  const configuracionModalidad = parametria.tasasInteres[modalidad];
+  if (!configuracionModalidad?.rangos) return 0;
+
+  // Buscar rango aplicable
+  const rangoAplicable = configuracionModalidad.rangos.find(
+    (rango) =>
       monto >= rango.rango.desde &&
-      (rango.rango.hasta === null || monto <= rango.rango.hasta);
-    const tipoAplica = rango.tipos.includes(
-      `${tipoCredito}_${zona.toUpperCase()}`
-    );
-    return montoAplica && tipoAplica;
-  });
-
-  return rangos ? rangos.tasas : null;
-};
-
-// Función para validar forma de pago FNG
-export const obtenerFormaPagoFNG = (codigoFNG) => {
-  const producto = parametria.productosFNG[codigoFNG];
-  if (!producto) return null;
-  return producto.formaPago;
-};
-
-// Función para calcular la comisión de la Ley MiPyme
-export const calcularComisionMipyme = (monto) => {
-  const SMLV = parametria.configuracionGeneral.salarioMinimo;
-  const rangosMipyme = parametria.leyMipyme.rangosSMLV;
-  const montoEnSMLV = monto / SMLV;
-
-  const rango = rangosMipyme.find(
-    (r) =>
-      montoEnSMLV >= r.desde && (r.hasta === null || montoEnSMLV <= r.hasta)
+      monto <= rango.rango.hasta &&
+      (rango.tipos?.includes(`${tipoCredito}`) ||
+        rango.tipos?.includes(`${tipoCredito}_${zona.toUpperCase()}`))
   );
 
-  return rango ? rango.comision : 0;
+  return rangoAplicable?.tasas || 0;
+};
+
+// Función para obtener forma de pago FNG
+export const obtenerFormaPagoFNG = (codigoFNG) => {
+  if (!codigoFNG) return "DIFERIDO"; // valor por defecto
+
+  const producto = parametria.productosFNG[codigoFNG];
+  if (!producto) return "DIFERIDO";
+
+  // Para productos que calculan sobre saldo, siempre es diferido
+  if (producto.tipoComision === "SALDO_MENSUAL") {
+    return "DIFERIDO";
+  }
+
+  return producto.formaPago || "DIFERIDO";
+};
+
+// Función para calcular comisión MiPyme
+export const calcularComisionMipyme = (monto) => {
+  if (!monto || !parametria.leyMipyme?.rangosSMLV) return 0;
+
+  const montoEnSMLV = calcularSMLV(monto);
+  const rango = parametria.leyMipyme.rangosSMLV.find(
+    (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
+  );
+
+  return rango?.comision || 0;
 };
 
 // Función para calcular costo de consulta a centrales
 export const calcularCostoCentrales = (monto) => {
-  const SMLV = parametria.configuracionGeneral.salarioMinimo;
-  const rangosCentrales = parametria.consultaCentrales.rangosCredito;
-  const montoEnSMLV = monto / SMLV;
+  if (!monto || !parametria.consultaCentrales?.rangosCredito) return 0;
 
-  const rango = rangosCentrales.find(
-    (r) =>
-      montoEnSMLV >= r.desde && (r.hasta === null || montoEnSMLV <= r.hasta)
+  const montoEnSMLV = calcularSMLV(monto);
+  const rango = parametria.consultaCentrales.rangosCredito.find(
+    (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
   );
 
-  return rango ? rango.valorSMLV : 0;
+  return rango?.valor || 0;
+};
+
+// Función auxiliar para validar rangos de montos
+export const validarMontoRango = (monto, modalidad) => {
+  if (!monto || !modalidad) return false;
+
+  const configuracionModalidad = parametria.modalidades[modalidad];
+  if (!configuracionModalidad?.montos) return false;
+
+  return (
+    monto >= configuracionModalidad.montos.minimo &&
+    monto <= configuracionModalidad.montos.maximo
+  );
+};
+
+// Función para obtener parámetros de producto FNG
+export const obtenerParametrosFNG = (codigoFNG) => {
+  if (!codigoFNG) return 0;
+
+  const producto = parametria.productosFNG[codigoFNG];
+  if (!producto) return 0;
+
+  return {
+    ...producto,
+    requiereValidacionCedula: ["EMP080", "EMP280"].includes(codigoFNG),
+  };
+};
+
+// Función para validar plazos
+export const validarPlazo = (plazo, modalidadPago, productoFNG) => {
+  if (!plazo || !modalidadPago)
+    return { valido: false, mensaje: "Datos incompletos" };
+
+  const mesesPorPeriodo =
+    parametria.configuracionGeneral.modalidadesPago[modalidadPago];
+  const plazoMeses = plazo * mesesPorPeriodo;
+
+  // Validar plazo mínimo general
+  if (plazoMeses < parametria.configuracionGeneral.plazoMinimo) {
+    return {
+      valido: false,
+      mensaje: `El plazo mínimo debe ser de ${parametria.configuracionGeneral.plazoMinimo} meses`,
+    };
+  }
+
+  // Validar plazos específicos del producto FNG
+  if (productoFNG) {
+    const producto = parametria.productosFNG[productoFNG];
+    if (producto?.plazos) {
+      if (plazoMeses < producto.plazos.minimo) {
+        return {
+          valido: false,
+          mensaje: `El plazo mínimo para este producto es de ${producto.plazos.minimo} meses`,
+        };
+      }
+      if (plazoMeses > producto.plazos.maximo) {
+        return {
+          valido: false,
+          mensaje: `El plazo máximo para este producto es de ${producto.plazos.maximo} meses`,
+        };
+      }
+    }
+  }
+
+  return { valido: true };
 };

@@ -59,7 +59,7 @@
       },
       {
         "desde": 100,
-        "hasta": null,
+        "hasta": 10000,
         "valorSMLV": 22000
       }
     ]
@@ -280,7 +280,7 @@
       },
       "PRODUCTIVO_MAYOR_MONTO": {
         "desde": 25,
-        "hasta": null,
+        "hasta": 120,
         "smlv": true
       }
     }
@@ -830,7 +830,7 @@
         },
         {
           "desde": 25,
-          "hasta": null,
+          "hasta": 120,
           "tipo": "PRODUCTIVO_MAYOR_MONTO"
         }
       ],
