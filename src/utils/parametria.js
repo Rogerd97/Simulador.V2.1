@@ -14,32 +14,6 @@ const calcularSMLV = (monto) => {
   return monto / SMLV;
 };
 
-// Función para determinar tipo de crédito según monto
-export const determinarTipoCredito = (monto, modalidad, zona = "") => {
-  if (!monto || !modalidad) return 0;
-
-  const montoEnSMLV = calcularSMLV(monto);
-
-  // Determinar tipo según modalidad
-  switch (modalidad) {
-    case "MICROCREDITO":
-      if (montoEnSMLV <= 6) return `POPULAR_${zona.toUpperCase()}`;
-      if (montoEnSMLV <= 25) return `PRODUCTIVO_${zona.toUpperCase()}`;
-      if (montoEnSMLV > 25) return "PRODUCTIVO_MAYOR_MONTO";
-      break;
-    case "COMERCIAL":
-      return "COMERCIAL";
-    case "CONSUMO":
-      return "CONSUMO";
-    case "VEHICULO":
-      return "VEHICULO";
-    case "LEY_DE_VICTIMAS":
-      return "CONSUMO";
-    default:
-      return 0;
-  }
-};
-
 // Función para validar cédula para fondos especiales
 export const validarCedulaFondoEspecial = (cedula) => {
   if (!cedula || !parametria.cedulasPermitidas) return 0;
@@ -60,21 +34,69 @@ export const validarCedulaFondoEspecial = (cedula) => {
 
 // Función para obtener tasa de interés
 export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
-  if (!monto || !modalidad || !tipoCredito || !zona) return 0;
+  if (!monto || !modalidad || !tipoCredito) return 0;
 
   const configuracionModalidad = parametria.tasasInteres[modalidad];
   if (!configuracionModalidad?.rangos) return 0;
 
   // Buscar rango aplicable
-  const rangoAplicable = configuracionModalidad.rangos.find(
-    (rango) =>
-      monto >= rango.rango.desde &&
-      monto <= rango.rango.hasta &&
-      (rango.tipos?.includes(`${tipoCredito}`) ||
-        rango.tipos?.includes(`${tipoCredito}_${zona.toUpperCase()}`))
-  );
+  const rangoAplicable = configuracionModalidad.rangos.find((rango) => {
+    // Verificar si el monto está en el rango
+    const montoEnRango =
+      monto >= rango.rango.desde && monto <= rango.rango.hasta;
 
-  return rangoAplicable?.tasas || 0;
+    if (!montoEnRango) return false;
+
+    // Para PRODUCTIVO_MAYOR_MONTO
+    if (
+      rango.tipo === "PRODUCTIVO_MAYOR_MONTO" &&
+      tipoCredito === "PRODUCTIVO_MAYOR_MONTO"
+    ) {
+      return true;
+    }
+
+    // Si el rango tiene tipos como objeto (estructura anidada)
+    if (typeof rango.tipos === "object" && !Array.isArray(rango.tipos)) {
+      return rango.tipos[tipoCredito] || rango.tipos[`${tipoCredito}_${zona}`];
+    }
+
+    // Si el rango tiene un tipo específico
+    if (rango.tipo) {
+      return rango.tipo === tipoCredito;
+    }
+
+    // Si el rango tiene un array de tipos
+    if (Array.isArray(rango.tipos)) {
+      return (
+        rango.tipos.includes(tipoCredito) ||
+        rango.tipos.includes(`${tipoCredito}_${zona}`)
+      );
+    }
+
+    return false;
+  });
+
+  if (!rangoAplicable) return 0;
+
+  // Para PRODUCTIVO_MAYOR_MONTO retornar tasas directamente
+  if (tipoCredito === "PRODUCTIVO_MAYOR_MONTO" && rangoAplicable.tasas) {
+    return rangoAplicable.tasas;
+  }
+
+  // Si las tasas están en una estructura anidada
+  if (
+    rangoAplicable.tipos &&
+    typeof rangoAplicable.tipos === "object" &&
+    !Array.isArray(rangoAplicable.tipos)
+  ) {
+    const tasaEspecifica =
+      rangoAplicable.tipos[tipoCredito] ||
+      rangoAplicable.tipos[`${tipoCredito}_${zona}`];
+    return tasaEspecifica?.tasas || 0;
+  }
+
+  // Si las tasas están directamente en el rango
+  return rangoAplicable.tasas || 0;
 };
 
 // Función para obtener forma de pago FNG
@@ -108,12 +130,15 @@ export const calcularComisionMipyme = (monto) => {
 export const calcularCostoCentrales = (monto) => {
   if (!monto || !parametria.consultaCentrales?.rangosCredito) return 0;
 
-  const montoEnSMLV = calcularSMLV(monto);
+  const SMLV = parametria.configuracionGeneral.salarioMinimo;
+  const montoEnSMLV = monto / SMLV;
+
   const rango = parametria.consultaCentrales.rangosCredito.find(
     (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
   );
 
-  return rango?.valor || 0;
+  // Retornar directamente el valor fijo según el rango
+  return rango?.valorSMLV || 0;
 };
 
 // Función auxiliar para validar rangos de montos

@@ -90,37 +90,40 @@ const App = () => {
 
   // Efecto para cálculos generales
   useEffect(() => {
-    if (monto && plazo && modalidadPago && productoFNG && tipologia) {
+    if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
-      const nuevoTipoCredito = determinarTipoCredito(
-        montoNum,
-        modalidadCredito,
-        tipologia
-      );
+      // Determinar tipo de crédito según monto y tipología
+      const nuevoTipoCredito = determinarTipoCredito(montoNum);
       setTipoCredito(nuevoTipoCredito);
 
-      const tasas = obtenerTasaInteres(
-        montoNum,
-        modalidadCredito,
-        nuevoTipoCredito,
-        tipologia
-      );
-      if (tasas) {
-        setInterestRate(tasas.mv);
+      // Obtener tasa de interés según el tipo de crédito
+      if (nuevoTipoCredito) {
+        const tasas = obtenerTasaInteres(
+          montoNum,
+          modalidadCredito,
+          nuevoTipoCredito,
+          tipologia
+        );
+        if (tasas) {
+          setInterestRate(tasas.mv);
+        }
       }
 
+      // Calcular comisión Mipyme
       const comisionMipyme = calcularComisionMipyme(montoNum);
       setMipymeRate(comisionMipyme);
 
-      const plazoMeses =
-        plazo *
-        (parametria.configuracionGeneral.modalidadesPago?.[modalidadPago] || 1);
-      setFngRate(calcularTasaFNG(montoNum, plazoMeses));
+      if (productoFNG) {
+        const plazoMeses =
+          plazo *
+          (parametria.configuracionGeneral.modalidadesPago?.[modalidadPago] ||
+            1);
+        setFngRate(calcularTasaFNG(montoNum, plazoMeses));
+      }
 
       setCostoCentrales(calcularCostoCentrales(montoNum));
     }
-  }, [monto, plazo, modalidadPago, productoFNG, modalidadCredito, tipologia]);
-
+  }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]);
   // Funciones auxiliares
 
   // Agregar esta función dentro del componente App, junto a las otras funciones auxiliares
@@ -221,26 +224,80 @@ const App = () => {
     }
   };
 
+  // Función para determinar tipo de crédito según monto
+  const determinarTipoCredito = (monto) => {
+    if (!monto || !modalidadCredito || !tipologia) return "";
+
+    const SMLV = parametria.configuracionGeneral.salarioMinimo;
+    const montoEnSMLV = monto / SMLV;
+
+    switch (modalidadCredito) {
+      case "MICROCREDITO":
+        if (montoEnSMLV <= 6) {
+          return `POPULAR_${tipologia}`;
+        } else if (montoEnSMLV <= 25) {
+          return `PRODUCTIVO_${tipologia}`;
+        } else {
+          return "PRODUCTIVO_MAYOR_MONTO";
+        }
+      case "COMERCIAL":
+        return "COMERCIAL";
+      case "CONSUMO":
+        return "CONSUMO";
+      case "VEHICULO":
+        return "VEHICULO";
+      case "LEY_DE_VICTIMAS":
+        return "CONSUMO";
+      default:
+        return "";
+    }
+  };
+
   const calcularAmortizacion = (
     capital,
     tasaMensual,
     plazoPeriodos,
     modalidad
   ) => {
-    const mesesPorPeriodo =
-      parametria.configuracionGeneral.modalidadesPago[modalidad];
+    console.log("Iniciando cálculo con:", {
+      capital,
+      tasaMensual,
+      plazoPeriodos,
+      modalidad,
+    });
+
+    if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
+      console.error("Faltan parámetros necesarios para el cálculo");
+      return [];
+    }
+
+    const MESES_POR_PERIODO = {
+      Mensual: 1,
+      Bimestral: 2,
+      Trimestral: 3,
+      Semestral: 6,
+      Anual: 12,
+    };
+
+    const mesesPorPeriodo = MESES_POR_PERIODO[modalidad] || 1;
     const plazoTotalMeses = plazoPeriodos * mesesPorPeriodo;
     const tasaPeriodica = ajustarTasaInteresPorPeriodicidad(
       tasaMensual,
       modalidad
     );
 
+    console.log("Parámetros calculados:", {
+      mesesPorPeriodo,
+      plazoTotalMeses,
+      tasaPeriodica,
+    });
+
     // Cálculo de la cuota constante
     const cuotaConstante =
       (capital * tasaPeriodica) /
       (1 - Math.pow(1 + tasaPeriodica, -plazoPeriodos));
 
-    // Cálculo inicial de comisiones
+    // Cálculos iniciales
     const producto = parametria.productosFNG[productoFNG];
     const fngTotal =
       producto.tipoComision === "UNICA_ANTICIPADA" ? capital * fngRate : 0;
@@ -276,23 +333,21 @@ const App = () => {
       const interesCuota = saldo * tasaPeriodica;
       const capitalCuota = cuotaConstante - interesCuota;
 
-      // Cálculo de FNG según tipo de producto
+      // Cálculo de FNG
       let fngCuota = 0;
       if (["EMP320", "EMP300", "EMP200"].includes(productoFNG)) {
-        // Para productos con cobro mensual sobre saldo
         fngCuota =
           saldo * producto.comisionMensual * mesesPorPeriodo * (1 + IVA);
       } else {
-        // Para productos con cobro anticipado
         if (i === 1) {
           fngCuota = fngTotal * (1 + IVA);
         }
       }
 
       // Cálculo del seguro de vida
-      const seguroVidaCuota = calcularSeguroVida(saldo);
+      const seguroVidaCuota = (saldo / 1000) * SEGURO_VIDA_RATE;
 
-      // Cálculo de centrales (solo en primera cuota)
+      // Cálculo de centrales
       const centralesCuota = i === 1 ? centralesTotal : 0;
 
       // Cálculo de la cuota total
@@ -308,34 +363,35 @@ const App = () => {
 
       amortizacion.push({
         cuota: i,
-        cuotaConstante: cuotaConstante.toFixed(2),
-        capitalCuota: capitalCuota.toFixed(2),
-        interesCuota: interesCuota.toFixed(2),
-        fngCuota: fngCuota.toFixed(2),
-        mipymeCuota: mipymeCuota.toFixed(2),
-        seguroVidaCuota: seguroVidaCuota.toFixed(2),
-        centralesCuota: centralesCuota.toFixed(2),
-        cuotaTotal: cuotaTotal.toFixed(2),
-        saldoRestante: saldo.toFixed(2),
+        cuotaConstante: Number(cuotaConstante.toFixed(2)),
+        capitalCuota: Number(capitalCuota.toFixed(2)),
+        interesCuota: Number(interesCuota.toFixed(2)),
+        fngCuota: Number(fngCuota.toFixed(2)),
+        mipymeCuota: Number(mipymeCuota.toFixed(2)),
+        seguroVidaCuota: Number(seguroVidaCuota.toFixed(2)),
+        centralesCuota: Number(centralesCuota.toFixed(2)),
+        cuotaTotal: Number(cuotaTotal.toFixed(2)),
+        saldoRestante: Number(saldo.toFixed(2)),
       });
     }
 
+    console.log("Amortización calculada:", amortizacion);
     return amortizacion;
   };
 
   // Agregar esta función junto a las otras funciones auxiliares
   const ajustarTasaInteresPorPeriodicidad = (tasaMensual, modalidad) => {
-    const mesesPorPeriodo = {
+    if (!tasaMensual) return 0;
+
+    const MESES_POR_PERIODO = {
       Mensual: 1,
       Bimestral: 2,
       Trimestral: 3,
-      Cuatrimestral: 4,
       Semestral: 6,
       Anual: 12,
     };
 
-    const periodoMeses = mesesPorPeriodo[modalidad] || 1;
-    // Ajustar la tasa mensual al periodo correspondiente
+    const periodoMeses = MESES_POR_PERIODO[modalidad] || 1;
     return Math.pow(1 + tasaMensual, periodoMeses) - 1;
   };
 
@@ -364,24 +420,44 @@ const App = () => {
     const montoNum = parseFloat(monto);
     if (!validateMonto(montoNum)) return;
 
-    // Crear la tabla de amortización
     try {
+      const montoNum = parseFloat(monto);
+
+      console.log("Valores para cálculo:", {
+        monto: montoNum,
+        tasa: interestRate,
+        plazo: parseInt(plazo, 10),
+        modalidad: modalidadPago,
+        tipoCredito,
+        tipologia,
+      });
+
+      if (!interestRate) {
+        setError("❗ No se pudo determinar la tasa de interés.");
+        return;
+      }
+
       const amort = calcularAmortizacion(
         montoNum,
         interestRate,
         parseInt(plazo, 10),
         modalidadPago
       );
+
+      console.log("Amortización calculada:", amort);
+
+      if (!amort || amort.length === 0) {
+        setError("❗ No se pudo generar la tabla de amortización.");
+        return;
+      }
+
       setAmortizacion(amort);
       setError("");
     } catch (err) {
       console.error("Error al calcular amortización:", err);
-      setError(
-        "❗ Error al calcular la tabla de amortización. Por favor verifica los datos ingresados."
-      );
+      setError(`❗ Error al calcular la tabla de amortización: ${err.message}`);
     }
-  };
-  // ... (resto de funciones auxiliares y validaciones) ...
+  }; // ... (resto de funciones auxiliares y validaciones) ...
 
   return (
     <div className="max-w-7xl mx-auto p-4">
@@ -569,6 +645,19 @@ const App = () => {
               readOnly
             />
           </div>
+          {/* Agregar después del campo de tipología */}
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label className="flex items-center gap-2 mb-2">
+              <span>📝</span>
+              <span className="font-semibold">Tipo de Crédito:</span>
+            </label>
+            <input
+              type="text"
+              className="w-full p-2 border rounded-md bg-gray-100"
+              value={tipoCredito || ""}
+              readOnly
+            />
+          </div>
 
           {/* Forma de Pago MiPyme */}
           <div className="bg-white p-4 rounded-lg shadow">
@@ -611,6 +700,11 @@ const App = () => {
           <div className="text-sm">
             <span className="font-semibold">Consulta Centrales:</span>
             <p className="mt-1">{costoCentrales.toLocaleString("es-CO")} COP</p>
+          </div>
+
+          <div className="text-sm">
+            <span className="font-semibold">Tipo de Crédito:</span>
+            <p className="mt-1">{tipoCredito || "-"}</p>
           </div>
         </div>
       </div>
