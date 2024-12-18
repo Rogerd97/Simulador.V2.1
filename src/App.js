@@ -103,6 +103,10 @@ const App = () => {
       const nuevoTipoCredito = determinarTipoCredito(montoNum);
       setTipoCredito(nuevoTipoCredito);
 
+      if (!validateMonto(montoNum)) {
+        return;
+      }
+
       // Obtener tasa de interés según el tipo de crédito
       if (nuevoTipoCredito) {
         const tasas = obtenerTasaInteres(
@@ -250,6 +254,16 @@ const App = () => {
     }
   };
 
+  const handleMontoChange = (e) => {
+    const valor = e.target.value;
+    setMonto(valor);
+    if (valor) {
+      validateMonto(parseFloat(valor));
+    } else {
+      setMontoError("");
+    }
+  };
+
   // Función para determinar tipo de crédito según monto
   const determinarTipoCredito = (monto) => {
     if (!monto || !modalidadCredito || !tipologia) return "";
@@ -295,16 +309,19 @@ const App = () => {
     return Math.pow(1 + tasaMensual, periodoMeses) - 1;
   };
 
-  const calcularSeguroVida = (saldo) => {
-    return (saldo / 1000) * SEGURO_VIDA_RATE;
-  };
-
   const calcularAmortizacion = (
     capital,
     tasaMensual,
     plazoPeriodos,
     modalidad
   ) => {
+    // Validaciones iniciales
+    if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
+      setError("❗ Faltan datos requeridos para el cálculo");
+      return [];
+    }
+
+    // Definición de períodos
     const MESES_POR_PERIODO = {
       Mensual: 1,
       Bimestral: 2,
@@ -313,11 +330,39 @@ const App = () => {
       Anual: 12,
     };
 
-    // Parámetros básicos
     const mesesPorPeriodo = MESES_POR_PERIODO[modalidad];
     const tasaPeriodica = Math.pow(1 + tasaMensual, mesesPorPeriodo) - 1;
 
-    // Cálculo de cuota básica (capital + intereses)
+    // Función auxiliar para calcular comisión MiPyme
+    const calcularMipymeCuota = (saldo, mesesTranscurridos, cuotaActual) => {
+      if (mesesTranscurridos % 12 === 0) {
+        const mipymeAnual = saldo * mipymeRate * (1 + IVA);
+
+        if (mipymePaymentOption === "Anticipado") {
+          return mesesTranscurridos === 0
+            ? mipymeAnual
+            : saldo * mipymeRate * (1 + IVA);
+        } else {
+          // Diferido
+          // Calcular cuántas cuotas quedan en el año
+          const cuotasPorAno = 12 / mesesPorPeriodo;
+          const cuotasRestantesAno = Math.min(
+            cuotasPorAno,
+            plazoPeriodos - cuotaActual + 1
+          );
+
+          // Ajuste para el último año si es incompleto
+          const mesesRestantes =
+            plazoPeriodos * mesesPorPeriodo - mesesTranscurridos;
+          const factorProporcional = Math.min(mesesRestantes / 12, 1);
+
+          return (mipymeAnual * factorProporcional) / cuotasRestantesAno;
+        }
+      }
+      return 0;
+    };
+
+    // Cálculo de cuota básica
     const cuotaBasica =
       (capital * tasaPeriodica * Math.pow(1 + tasaPeriodica, plazoPeriodos)) /
       (Math.pow(1 + tasaPeriodica, plazoPeriodos) - 1);
@@ -327,93 +372,42 @@ const App = () => {
     let mesesTranscurridos = 0;
 
     for (let i = 1; i <= plazoPeriodos; i++) {
-      // Cálculos básicos
+      // Cálculo de intereses y capital
       const interesCuota = saldo * tasaPeriodica;
       const capitalCuota = cuotaBasica - interesCuota;
 
       // Cálculo de FNG
       let fngCuota = 0;
       if (["EMP320", "EMP300", "EMP200"].includes(productoFNG)) {
+        // Productos con cobro mensual sobre saldo
         fngCuota =
           saldo *
           parametria.productosFNG[productoFNG].comisionMensual *
           mesesPorPeriodo *
           (1 + IVA);
       } else if (i === 1) {
+        // Productos con cobro anticipado
         fngCuota = capital * fngRate * (1 + IVA);
       }
 
-      // Seguro de vida
+      // Cálculo del seguro de vida
       const seguroVidaCuota = (saldo / 1000) * SEGURO_VIDA_RATE;
 
-      const calcularCuotasMipymeRestantes = (
-        mesActual,
-        mesesPorPeriodo,
-        plazoPeriodos,
-        cuotaActual
-      ) => {
-        // Calcular en qué mes del año estamos
-        const mesDelAno = mesActual % 12;
-
-        // Calcular cuántas cuotas quedan en el año según la periodicidad
-        const cuotasEnUnAno = 12 / mesesPorPeriodo;
-        const cuotasRestantesAno = Math.ceil(
-          (12 - mesDelAno) / mesesPorPeriodo
-        );
-
-        // Calcular cuántas cuotas quedan en total
-        const cuotasTotales = plazoPeriodos - cuotaActual + 1;
-
-        // Retornar el mínimo entre las cuotas restantes del año y las totales
-        return Math.min(cuotasRestantesAno, cuotasTotales);
-      };
-
-      // Cálculo de MiPyme
-      let mipymeCuota = 0;
-      if (mipymePaymentOption === "Diferido") {
-        if (mesesTranscurridos % 12 === 0) {
-          // Calcular comisión anual sobre el saldo actual
-          const mipymeAnual = saldo * mipymeRate * (1 + IVA);
-
-          // Calcular cuántas cuotas quedan según la periodicidad
-          const cuotasRestantes = calcularCuotasMipymeRestantes(
-            mesesTranscurridos,
-            mesesPorPeriodo,
-            plazoPeriodos,
-            i
-          );
-
-          // Si quedan menos meses que un año completo, ajustar proporcionalmente
-          const factorProporcional = Math.min(
-            (12 - (mesesTranscurridos % 12)) / 12,
-            1
-          );
-
-          // Distribuir el monto ajustado en las cuotas restantes
-          mipymeCuota = (mipymeAnual * factorProporcional) / cuotasRestantes;
-        }
-      } else {
-        // Anticipado
-        if (mesesTranscurridos % 12 === 0) {
-          // Para pago anticipado, calcular sobre el saldo y ajustar si es el último año
-          const mesesRestantes =
-            plazoPeriodos * mesesPorPeriodo - mesesTranscurridos;
-          const factorProporcional = Math.min(mesesRestantes / 12, 1);
-          mipymeCuota = saldo * mipymeRate * (1 + IVA) * factorProporcional;
-        }
-      }
+      // Cálculo de la comisión MiPyme
+      const mipymeCuota = calcularMipymeCuota(saldo, mesesTranscurridos, i);
 
       // Centrales (solo en primera cuota)
       const centralesCuota = i === 1 ? calcularCostoCentrales(capital) : 0;
 
-      // Cuota total
+      // Cálculo de la cuota total
       const cuotaTotal =
-        cuotaBasica + fngCuota + seguroVidaCuota + mipymeCuota + centralesCuota;
+        cuotaBasica + fngCuota + mipymeCuota + seguroVidaCuota + centralesCuota;
 
-      // Actualizar saldo y meses transcurridos
-      saldo = Math.max(0, saldo - capitalCuota); // Evitar saldos negativos
+      // Actualización del saldo
+      saldo = Math.max(0, saldo - capitalCuota);
       mesesTranscurridos += mesesPorPeriodo;
 
+      // Agregar la cuota a la tabla de amortización
       amortizacion.push({
         cuota: i,
         cuotaConstante: Number(cuotaBasica.toFixed(2)),
@@ -430,8 +424,8 @@ const App = () => {
 
     return amortizacion;
   };
-
   const handleCalcular = () => {
+    // Validar campos obligatorios
     if (
       !monto ||
       !plazo ||
@@ -444,8 +438,53 @@ const App = () => {
       return;
     }
 
+    // Validar cédula para productos específicos
+    if (["EMP080", "EMP280"].includes(productoFNG) && !cedula) {
+      setError("❗ La cédula es requerida para este producto.");
+      return;
+    }
+
     const montoNum = parseFloat(monto);
     const plazoNum = parseInt(plazo, 10);
+
+    // Validar que los números sean válidos
+    if (isNaN(montoNum) || isNaN(plazoNum)) {
+      setError("❗ El monto y el plazo deben ser valores numéricos válidos.");
+      return;
+    }
+
+    // Validar monto según modalidad y producto FNG
+    if (!validateMonto(montoNum)) {
+      // No necesitamos setear error aquí porque validateMonto ya lo hace
+      return;
+    }
+
+    // Validar plazo mínimo y producto FNG
+    const plazoMeses = plazoNum * MESES_POR_PERIODO[modalidadPago];
+    const productoConfig = parametria.productosFNG[productoFNG];
+
+    if (productoConfig?.plazos) {
+      if (plazoMeses < productoConfig.plazos.minimo) {
+        setError(
+          `❗ El plazo mínimo para ${productoConfig.nombre} es de ${productoConfig.plazos.minimo} meses.`
+        );
+        return;
+      }
+      if (plazoMeses > productoConfig.plazos.maximo) {
+        setError(
+          `❗ El plazo máximo para ${productoConfig.nombre} es de ${productoConfig.plazos.maximo} meses.`
+        );
+        return;
+      }
+    }
+
+    // Validar que tengamos tasa de interés
+    if (!interestRate) {
+      setError(
+        "❗ No se pudo determinar la tasa de interés. Verifique los datos ingresados."
+      );
+      return;
+    }
 
     try {
       const amort = calcularAmortizacion(
@@ -455,12 +494,18 @@ const App = () => {
         modalidadPago
       );
 
+      if (!amort || amort.length === 0) {
+        setError("❗ No se pudo generar la tabla de amortización.");
+        return;
+      }
+
       setAmortizacion(amort);
+      setError(""); // Limpiar cualquier error previo
     } catch (err) {
-      setError("Error al calcular la amortización");
+      console.error("Error en cálculo:", err);
+      setError(`❗ Error al calcular la amortización: ${err.message}`);
     }
   };
-
   return (
     <div className="max-w-7xl mx-auto p-4">
       <div className="flex items-center gap-3 mb-6">
