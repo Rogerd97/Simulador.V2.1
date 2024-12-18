@@ -21,6 +21,12 @@ const App = () => {
   const [cedula, setCedula] = useState("");
   const [tipoCredito, setTipoCredito] = useState("");
 
+  // Estados para ubicación
+  const [departamento, setDepartamento] = useState("");
+  const [municipio, setMunicipio] = useState("");
+  const [municipiosDisponibles, setMunicipiosDisponibles] = useState([]);
+  const [productosFNGFiltrados, setProductosFNGFiltrados] = useState({});
+
   // Estados para tasas y comisiones
   const [fngRate, setFngRate] = useState(0);
   const [mipymeRate, setMipymeRate] = useState(0);
@@ -29,6 +35,7 @@ const App = () => {
 
   // Estados para opciones de pago
   const [mipymePaymentOption, setMipymePaymentOption] = useState("Diferido");
+  const [fngPaymentOption, setFngPaymentOption] = useState("DIFERIDO");
 
   // Estados para validación y errores
   const [montoError, setMontoError] = useState("");
@@ -43,14 +50,92 @@ const App = () => {
   const PLAZO_MINIMO = parametria.configuracionGeneral.plazoMinimo;
   const IVA = parametria.configuracionGeneral.iva;
 
+  // Efecto para actualizar municipios cuando cambia el departamento
+  useEffect(() => {
+    if (departamento) {
+      const municipiosDelDepartamento =
+        parametria.ubicaciones[departamento] || {};
+      setMunicipiosDisponibles(Object.keys(municipiosDelDepartamento));
+      setMunicipio(""); // Resetear municipio
+    }
+  }, [departamento]);
+
+  // Efecto para actualizar tipología cuando cambia el municipio
+  useEffect(() => {
+    if (departamento && municipio) {
+      const tipologiaMunicipio =
+        parametria.ubicaciones[departamento][municipio];
+      setTipologia(tipologiaMunicipio);
+    }
+  }, [departamento, municipio]);
+
+  // Efecto para filtrar productos FNG según modalidad
+  useEffect(() => {
+    if (modalidadCredito) {
+      const productosFiltered = Object.entries(parametria.productosFNG)
+        .filter(([_, producto]) =>
+          producto.modalidadesPermitidas.includes(modalidadCredito)
+        )
+        .reduce((acc, [codigo, producto]) => {
+          acc[codigo] = producto;
+          return acc;
+        }, {});
+
+      setProductosFNGFiltrados(productosFiltered);
+
+      if (productoFNG && !productosFiltered[productoFNG]) {
+        setProductoFNG("");
+      }
+    }
+  }, [modalidadCredito]);
+
+  // Efecto para actualizar tasas y comisiones
+  useEffect(() => {
+    if (monto && plazo && modalidadPago && productoFNG) {
+      const montoNum = parseFloat(monto);
+      const nuevoTipoCredito = determinarTipoCredito(
+        montoNum,
+        modalidadCredito,
+        tipologia
+      );
+      setTipoCredito(nuevoTipoCredito);
+
+      const tasas = obtenerTasaInteres(
+        montoNum,
+        modalidadCredito,
+        nuevoTipoCredito,
+        tipologia
+      );
+      if (tasas) {
+        setInterestRate(tasas.mv);
+      }
+
+      const comisionMipyme = calcularComisionMipyme(montoNum);
+      setMipymeRate(comisionMipyme);
+
+      const plazoMeses =
+        plazo * parametria.configuracionGeneral.modalidadesPago[modalidadPago];
+      setFngRate(calcularTasaFNG(montoNum, plazoMeses));
+
+      setCostoCentrales(calcularCostoCentrales(montoNum));
+    }
+  }, [monto, plazo, modalidadPago, productoFNG, modalidadCredito, tipologia]);
+
   // Funciones de validación
   const validateMonto = (valor) => {
-    if (!valor || valor < parametria.configuracionGeneral.montoMinimo) {
-      setMontoError("❌ El monto mínimo es de 1 millón de COP.");
+    const modalidadConfig = parametria.modalidades[modalidadCredito];
+    if (!modalidadConfig?.montos) return false;
+
+    if (!valor || valor < modalidadConfig.montos.minimo) {
+      setMontoError(
+        `❌ El monto mínimo es de ${modalidadConfig.montos.minimo.toLocaleString()} COP.`
+      );
       return false;
     }
-    if (valor > parametria.configuracionGeneral.montoMaximo) {
-      setMontoError("❌ El monto máximo permitido es de 156.000.000 COP.");
+    if (valor > modalidadConfig.montos.maximo) {
+      setMontoError(
+        `❌ El monto máximo permitido es de ${modalidadConfig.montos.maximo.toLocaleString()} COP.`
+      );
       return false;
     }
     setMontoError("");
@@ -104,6 +189,7 @@ const App = () => {
     return Math.pow(1 + tasaMensual, mesesPorPeriodo) - 1;
   };
 
+  // Función principal de cálculo de amortización
   const calcularAmortizacion = (
     capital,
     tasaMensual,
@@ -118,12 +204,10 @@ const App = () => {
       modalidad
     );
 
-    // Cálculo de la cuota constante
     const cuotaConstante =
       (capital * tasaPeriodica) /
       (1 - Math.pow(1 + tasaPeriodica, -plazoPeriodos));
 
-    // Cálculo inicial de comisiones
     const producto = parametria.productosFNG[productoFNG];
     const fngTotal =
       producto.tipoComision === "UNICA_ANTICIPADA" ? capital * fngRate : 0;
@@ -135,7 +219,6 @@ const App = () => {
     let mesesTranscurridos = 0;
 
     for (let i = 1; i <= plazoPeriodos; i++) {
-      // Cálculo de MiPyme
       let mipymeCuota = 0;
       if (mipymePaymentOption === "Anticipado") {
         if (mesesTranscurridos % 12 === 0) {
@@ -155,11 +238,9 @@ const App = () => {
         }
       }
 
-      // Cálculo de intereses y capital
       const interesCuota = saldo * tasaPeriodica;
       const capitalCuota = cuotaConstante - interesCuota;
 
-      // Cálculo de FNG según modalidad
       let fngCuota = 0;
       if (producto.tipoComision === "SALDO_MENSUAL") {
         fngCuota =
@@ -170,13 +251,9 @@ const App = () => {
         fngCuota = (fngTotal * (1 + IVA)) / plazoPeriodos;
       }
 
-      // Cálculo del seguro de vida para el período
       const seguroVidaCuota = calcularSeguroVida(saldo);
-
-      // Cálculo de centrales (solo en primera cuota)
       const centralesCuota = i === 1 ? centralesTotal : 0;
 
-      // Cálculo de la cuota total
       const cuotaTotal =
         cuotaConstante +
         fngCuota +
@@ -203,41 +280,6 @@ const App = () => {
 
     return amortizacion;
   };
-
-  // Efectos
-  useEffect(() => {
-    if (monto && plazo && modalidadPago && productoFNG) {
-      const montoNum = parseFloat(monto);
-      const nuevoTipoCredito = determinarTipoCredito(
-        montoNum,
-        modalidadCredito
-      );
-      setTipoCredito(nuevoTipoCredito);
-
-      // Calcular tasas
-      const tasas = obtenerTasaInteres(
-        montoNum,
-        modalidadCredito,
-        nuevoTipoCredito,
-        tipologia
-      );
-      if (tasas) {
-        setInterestRate(tasas.mv);
-      }
-
-      // Calcular comisión MiPyme
-      const comisionMipyme = calcularComisionMipyme(montoNum);
-      setMipymeRate(comisionMipyme);
-
-      // Calcular FNG
-      const plazoMeses =
-        plazo * parametria.configuracionGeneral.modalidadesPago[modalidadPago];
-      setFngRate(calcularTasaFNG(montoNum, plazoMeses));
-
-      // Calcular costo de centrales
-      setCostoCentrales(calcularCostoCentrales(montoNum));
-    }
-  }, [monto, plazo, modalidadPago, productoFNG, modalidadCredito, tipologia]);
 
   // Manejadores de eventos
   const handleMontoChange = (e) => {
@@ -271,14 +313,6 @@ const App = () => {
       }
     }
 
-    if (
-      valor * parametria.configuracionGeneral.modalidadesPago[modalidadPago] <
-      PLAZO_MINIMO
-    ) {
-      setError(`❗ El plazo mínimo debe ser de ${PLAZO_MINIMO} meses.`);
-      return;
-    }
-
     setError("");
     setPlazo(valor);
   };
@@ -286,14 +320,14 @@ const App = () => {
   const handleProductoFNGChange = (e) => {
     const nuevoProducto = e.target.value;
     setProductoFNG(nuevoProducto);
+    setCedula("");
+    setCedulaError("");
 
     const producto = parametria.productosFNG[nuevoProducto];
     if (producto) {
-      // Si el producto requiere validación de cédula y no hay cédula
-      if (["EMP080", "EMP280"].includes(nuevoProducto) && !cedula) {
+      if (["EMP080", "EMP280"].includes(nuevoProducto)) {
         setCedulaError("❌ Este producto requiere validación de cédula.");
       }
-      // Si el producto tiene forma de pago fija
       if (producto.formaPago) {
         setFngPaymentOption(producto.formaPago);
       }
@@ -301,13 +335,18 @@ const App = () => {
   };
 
   const handleCalcular = () => {
-    // Validaciones básicas
-    if (!monto || !plazo || !modalidadPago || !productoFNG) {
-      setError("❗ Por favor completa todos los campos.");
+    if (
+      !monto ||
+      !plazo ||
+      !modalidadPago ||
+      !productoFNG ||
+      !departamento ||
+      !municipio
+    ) {
+      setError("❗ Por favor completa todos los campos obligatorios.");
       return;
     }
 
-    // Validaciones específicas
     const montoNum = parseFloat(monto);
     if (!validateMonto(montoNum) || !validarFondoEspecial()) {
       return;
@@ -317,7 +356,6 @@ const App = () => {
       plazo * parametria.configuracionGeneral.modalidadesPago[modalidadPago];
     const producto = parametria.productosFNG[productoFNG];
 
-    // Validar plazos del producto FNG
     if (
       producto.plazos &&
       (plazoMeses < producto.plazos.minimo ||
@@ -329,20 +367,17 @@ const App = () => {
       return;
     }
 
-    // Validar plazo mínimo general
     if (plazoMeses < PLAZO_MINIMO) {
       setError(`❗ El plazo mínimo debe ser de ${PLAZO_MINIMO} meses.`);
       return;
     }
 
-    // Proceder con el cálculo
     const amort = calcularAmortizacion(
       montoNum,
       interestRate,
       parseInt(plazo, 10),
       modalidadPago
     );
-
     setAmortizacion(amort);
     setError("");
   };
@@ -365,6 +400,9 @@ const App = () => {
     setCedulaError("");
     setError("");
     setAmortizacion([]);
+    setDepartamento("");
+    setMunicipio("");
+    setMunicipiosDisponibles([]);
   };
 
   // Renderizado del componente
@@ -382,6 +420,41 @@ const App = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Primera columna */}
         <div className="space-y-4">
+          {/* Ubicación */}
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label className="flex items-center gap-2 mb-2">
+              <span>📍</span>
+              <span className="font-semibold">Ubicación:</span>
+            </label>
+            <div className="space-y-2">
+              <select
+                className="w-full p-2 border rounded-md mb-2"
+                value={departamento}
+                onChange={(e) => setDepartamento(e.target.value)}
+              >
+                <option value="">-- Seleccione Departamento --</option>
+                {Object.keys(parametria.ubicaciones).map((dep) => (
+                  <option key={dep} value={dep}>
+                    {dep.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={municipio}
+                onChange={(e) => setMunicipio(e.target.value)}
+                disabled={!departamento}
+              >
+                <option value="">-- Seleccione Municipio --</option>
+                {municipiosDisponibles.map((mun) => (
+                  <option key={mun} value={mun}>
+                    {mun.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Modalidad de crédito */}
           <div className="bg-white p-4 rounded-lg shadow">
             <label className="flex items-center gap-2 mb-2">
@@ -401,22 +474,6 @@ const App = () => {
             </select>
           </div>
 
-          {/* Tipología */}
-          <div className="bg-white p-4 rounded-lg shadow">
-            <label className="flex items-center gap-2 mb-2">
-              <span>🏘️</span>
-              <span className="font-semibold">Tipología:</span>
-            </label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={tipologia}
-              onChange={(e) => setTipologia(e.target.value)}
-            >
-              <option value="RURAL">Rural</option>
-              <option value="URBANO">Urbano</option>
-            </select>
-          </div>
-
           {/* Producto FNG */}
           <div className="bg-white p-4 rounded-lg shadow">
             <label className="flex items-center gap-2 mb-2">
@@ -429,7 +486,7 @@ const App = () => {
               onChange={handleProductoFNGChange}
             >
               <option value="">-- Seleccione un producto --</option>
-              {Object.entries(parametria.productosFNG).map(
+              {Object.entries(productosFNGFiltrados).map(
                 ([codigo, producto]) => (
                   <option key={codigo} value={codigo}>
                     {producto.nombre} ({codigo})
@@ -439,7 +496,7 @@ const App = () => {
             </select>
           </div>
 
-          {/* Cédula (si es necesario) */}
+          {/* Campo de cédula condicional */}
           {["EMP080", "EMP280"].includes(productoFNG) && (
             <div className="bg-white p-4 rounded-lg shadow">
               <label className="flex items-center gap-2 mb-2">
@@ -452,6 +509,7 @@ const App = () => {
                 value={cedula}
                 onChange={(e) => setCedula(e.target.value)}
                 placeholder="Ingrese el número de cédula"
+                required
               />
               {cedulaError && (
                 <p className="text-red-500 text-sm mt-1">{cedulaError}</p>
@@ -470,9 +528,8 @@ const App = () => {
               className="w-full p-2 border rounded-md"
               value={monto}
               onChange={handleMontoChange}
-              min={parametria.configuracionGeneral.montoMinimo}
               step="1000"
-              placeholder="Mínimo 1.000.000 COP"
+              placeholder="Ingrese el monto del crédito"
             />
             {montoError && (
               <p className="text-red-500 text-sm mt-1">{montoError}</p>
@@ -493,13 +550,13 @@ const App = () => {
               value={modalidadPago}
               onChange={(e) => setModalidadPago(e.target.value)}
             >
-              {Object.keys(parametria.configuracionGeneral.modalidadesPago).map(
-                (modalidad) => (
-                  <option key={modalidad} value={modalidad}>
-                    {modalidad}
-                  </option>
-                )
-              )}
+              {Object.keys(
+                parametria.configuracionGeneral.modalidadesPago || {}
+              ).map((modalidad) => (
+                <option key={modalidad} value={modalidad}>
+                  {modalidad}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -516,6 +573,20 @@ const App = () => {
               onChange={handlePlazoChange}
               min="1"
               placeholder="Ingrese el número de períodos"
+            />
+          </div>
+
+          {/* Tipología (solo mostrar) */}
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label className="flex items-center gap-2 mb-2">
+              <span>🏘️</span>
+              <span className="font-semibold">Tipología:</span>
+            </label>
+            <input
+              type="text"
+              className="w-full p-2 border rounded-md bg-gray-100"
+              value={tipologia}
+              readOnly
             />
           </div>
 
@@ -554,7 +625,7 @@ const App = () => {
           </div>
           <div className="text-sm">
             <span className="font-semibold">Seguro de Vida:</span>
-            <p className="mt-1">{SEGURO_VIDA_RATE} COP por cada 1.000 COP</p>
+            <p className="mt-1">{SEGURO_VIDA_RATE} por mil</p>
           </div>
           <div className="text-sm">
             <span className="font-semibold">Consulta Centrales:</span>
@@ -588,67 +659,61 @@ const App = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Cuota
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cuota Constante
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Capital
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Interés
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   FNG
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Ley MiPyme
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seguro de Vida
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Seguro Vida
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Centrales
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Cuota Total
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Saldo Restante
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Saldo
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200">
               {amortizacion.map((cuota, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">{cuota.cuota}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {parseFloat(cuota.cuotaConstante).toLocaleString("es-CO")}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                <tr key={index}>
+                  <td className="px-6 py-4">{cuota.cuota}</td>
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.capitalCuota).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.interesCuota).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.fngCuota).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.mipymeCuota).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.seguroVidaCuota).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.centralesCuota).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.cuotaTotal).toLocaleString("es-CO")}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {parseFloat(cuota.saldoRestante).toLocaleString("es-CO")}
                   </td>
                 </tr>

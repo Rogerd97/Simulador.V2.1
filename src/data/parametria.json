@@ -6,6 +6,14 @@
     "iva": 0.19,
     "seguroVida": {
       "tasaPorMil": 0.8
+    },
+    "modalidadesPago": {
+      "Mensual": 1,
+      "Bimestral": 2,
+      "Trimestral": 3,
+      "Cuatrimestral": 4,
+      "Semestral": 6,
+      "Anual": 12
     }
   },
 
