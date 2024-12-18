@@ -9,7 +9,14 @@ import {
   calcularCostoCentrales,
 } from "./utils/parametria";
 import "./styles.css";
-
+// Definir la constante MESES_POR_PERIODO fuera de las funciones
+const MESES_POR_PERIODO = {
+  Mensual: 1,
+  Bimestral: 2,
+  Trimestral: 3,
+  Semestral: 6,
+  Anual: 12,
+};
 const App = () => {
   // Estados base
   const [monto, setMonto] = useState("");
@@ -130,6 +137,30 @@ const App = () => {
   const validateMonto = (valor) => {
     if (!modalidadCredito) return false;
 
+    // Validación específica para productos FNG primero
+    if (productoFNG) {
+      const productoConfig = parametria.productosFNG[productoFNG];
+      if (productoConfig?.montos) {
+        if (valor < productoConfig.montos.minimo) {
+          setMontoError(
+            `❌ El monto para ${
+              productoConfig.nombre
+            } debe ser mayor a ${productoConfig.montos.minimo.toLocaleString()} COP.`
+          );
+          return false;
+        }
+        if (valor > productoConfig.montos.maximo) {
+          setMontoError(
+            `❌ El monto para ${
+              productoConfig.nombre
+            } debe ser menor a ${productoConfig.montos.maximo.toLocaleString()} COP.`
+          );
+          return false;
+        }
+      }
+    }
+
+    // Luego validación por modalidad
     const modalidadConfig = parametria.modalidades[modalidadCredito];
     if (!modalidadConfig?.montos) return false;
 
@@ -145,29 +176,6 @@ const App = () => {
         `❌ El monto máximo para ${modalidadCredito} es de ${modalidadConfig.montos.maximo.toLocaleString()} COP.`
       );
       return false;
-    }
-
-    // Si el producto FNG está seleccionado, validar sus montos también
-    if (productoFNG) {
-      const productoConfig = parametria.productosFNG[productoFNG];
-      if (productoConfig?.montos) {
-        if (valor < productoConfig.montos.minimo) {
-          setMontoError(
-            `❌ El monto mínimo para ${
-              productoConfig.nombre
-            } es de ${productoConfig.montos.minimo.toLocaleString()} COP.`
-          );
-          return false;
-        }
-        if (valor > productoConfig.montos.maximo) {
-          setMontoError(
-            `❌ El monto máximo para ${
-              productoConfig.nombre
-            } es de ${productoConfig.montos.maximo.toLocaleString()} COP.`
-          );
-          return false;
-        }
-      }
     }
 
     setMontoError("");
@@ -188,6 +196,24 @@ const App = () => {
   // Manejadores de eventos
   const handleProductoFNGChange = (e) => {
     const nuevoProducto = e.target.value;
+    const montoActual = parseFloat(monto);
+
+    // Validar montos si ya hay un monto ingresado
+    if (montoActual) {
+      const productoConfig = parametria.productosFNG[nuevoProducto];
+      if (productoConfig?.montos) {
+        if (
+          montoActual < productoConfig.montos.minimo ||
+          montoActual > productoConfig.montos.maximo
+        ) {
+          setError(
+            `❗ El monto ingresado no es válido para el producto ${nuevoProducto}`
+          );
+          return;
+        }
+      }
+    }
+
     setProductoFNG(nuevoProducto);
     setCedula("");
     setCedulaError("");
@@ -253,132 +279,6 @@ const App = () => {
     }
   };
 
-  const calcularAmortizacion = (
-    capital,
-    tasaMensual,
-    plazoPeriodos,
-    modalidad
-  ) => {
-    console.log("Iniciando cálculo con:", {
-      capital,
-      tasaMensual,
-      plazoPeriodos,
-      modalidad,
-    });
-
-    if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
-      console.error("Faltan parámetros necesarios para el cálculo");
-      return [];
-    }
-
-    const MESES_POR_PERIODO = {
-      Mensual: 1,
-      Bimestral: 2,
-      Trimestral: 3,
-      Semestral: 6,
-      Anual: 12,
-    };
-
-    const mesesPorPeriodo = MESES_POR_PERIODO[modalidad] || 1;
-    const plazoTotalMeses = plazoPeriodos * mesesPorPeriodo;
-    const tasaPeriodica = ajustarTasaInteresPorPeriodicidad(
-      tasaMensual,
-      modalidad
-    );
-
-    console.log("Parámetros calculados:", {
-      mesesPorPeriodo,
-      plazoTotalMeses,
-      tasaPeriodica,
-    });
-
-    // Cálculo de la cuota constante
-    const cuotaConstante =
-      (capital * tasaPeriodica) /
-      (1 - Math.pow(1 + tasaPeriodica, -plazoPeriodos));
-
-    // Cálculos iniciales
-    const producto = parametria.productosFNG[productoFNG];
-    const fngTotal =
-      producto.tipoComision === "UNICA_ANTICIPADA" ? capital * fngRate : 0;
-    const mipymeInicial = capital * mipymeRate;
-    const centralesTotal = calcularCostoCentrales(capital);
-
-    let amortizacion = [];
-    let saldo = capital;
-    let mesesTranscurridos = 0;
-
-    for (let i = 1; i <= plazoPeriodos; i++) {
-      // Cálculo de MiPyme
-      let mipymeCuota = 0;
-      if (mipymePaymentOption === "Anticipado") {
-        if (mesesTranscurridos % 12 === 0) {
-          mipymeCuota =
-            (mesesTranscurridos === 0 ? mipymeInicial : saldo * mipymeRate) *
-            (1 + IVA);
-        }
-      } else {
-        if (mesesTranscurridos % 12 === 0) {
-          const mipymeAnual =
-            (mesesTranscurridos === 0 ? mipymeInicial : saldo * mipymeRate) *
-            (1 + IVA);
-          const cuotasRestantesAno = Math.ceil(
-            (12 - (mesesTranscurridos % 12)) / mesesPorPeriodo
-          );
-          mipymeCuota = mipymeAnual / cuotasRestantesAno;
-        }
-      }
-
-      // Cálculo de intereses y capital
-      const interesCuota = saldo * tasaPeriodica;
-      const capitalCuota = cuotaConstante - interesCuota;
-
-      // Cálculo de FNG
-      let fngCuota = 0;
-      if (["EMP320", "EMP300", "EMP200"].includes(productoFNG)) {
-        fngCuota =
-          saldo * producto.comisionMensual * mesesPorPeriodo * (1 + IVA);
-      } else {
-        if (i === 1) {
-          fngCuota = fngTotal * (1 + IVA);
-        }
-      }
-
-      // Cálculo del seguro de vida
-      const seguroVidaCuota = (saldo / 1000) * SEGURO_VIDA_RATE;
-
-      // Cálculo de centrales
-      const centralesCuota = i === 1 ? centralesTotal : 0;
-
-      // Cálculo de la cuota total
-      const cuotaTotal =
-        cuotaConstante +
-        fngCuota +
-        mipymeCuota +
-        seguroVidaCuota +
-        centralesCuota;
-
-      saldo -= capitalCuota;
-      mesesTranscurridos += mesesPorPeriodo;
-
-      amortizacion.push({
-        cuota: i,
-        cuotaConstante: Number(cuotaConstante.toFixed(2)),
-        capitalCuota: Number(capitalCuota.toFixed(2)),
-        interesCuota: Number(interesCuota.toFixed(2)),
-        fngCuota: Number(fngCuota.toFixed(2)),
-        mipymeCuota: Number(mipymeCuota.toFixed(2)),
-        seguroVidaCuota: Number(seguroVidaCuota.toFixed(2)),
-        centralesCuota: Number(centralesCuota.toFixed(2)),
-        cuotaTotal: Number(cuotaTotal.toFixed(2)),
-        saldoRestante: Number(saldo.toFixed(2)),
-      });
-    }
-
-    console.log("Amortización calculada:", amortizacion);
-    return amortizacion;
-  };
-
   // Agregar esta función junto a las otras funciones auxiliares
   const ajustarTasaInteresPorPeriodicidad = (tasaMensual, modalidad) => {
     if (!tasaMensual) return 0;
@@ -399,6 +299,138 @@ const App = () => {
     return (saldo / 1000) * SEGURO_VIDA_RATE;
   };
 
+  const calcularAmortizacion = (
+    capital,
+    tasaMensual,
+    plazoPeriodos,
+    modalidad
+  ) => {
+    const MESES_POR_PERIODO = {
+      Mensual: 1,
+      Bimestral: 2,
+      Trimestral: 3,
+      Semestral: 6,
+      Anual: 12,
+    };
+
+    // Parámetros básicos
+    const mesesPorPeriodo = MESES_POR_PERIODO[modalidad];
+    const tasaPeriodica = Math.pow(1 + tasaMensual, mesesPorPeriodo) - 1;
+
+    // Cálculo de cuota básica (capital + intereses)
+    const cuotaBasica =
+      (capital * tasaPeriodica * Math.pow(1 + tasaPeriodica, plazoPeriodos)) /
+      (Math.pow(1 + tasaPeriodica, plazoPeriodos) - 1);
+
+    let amortizacion = [];
+    let saldo = capital;
+    let mesesTranscurridos = 0;
+
+    for (let i = 1; i <= plazoPeriodos; i++) {
+      // Cálculos básicos
+      const interesCuota = saldo * tasaPeriodica;
+      const capitalCuota = cuotaBasica - interesCuota;
+
+      // Cálculo de FNG
+      let fngCuota = 0;
+      if (["EMP320", "EMP300", "EMP200"].includes(productoFNG)) {
+        fngCuota =
+          saldo *
+          parametria.productosFNG[productoFNG].comisionMensual *
+          mesesPorPeriodo *
+          (1 + IVA);
+      } else if (i === 1) {
+        fngCuota = capital * fngRate * (1 + IVA);
+      }
+
+      // Seguro de vida
+      const seguroVidaCuota = (saldo / 1000) * SEGURO_VIDA_RATE;
+
+      const calcularCuotasMipymeRestantes = (
+        mesActual,
+        mesesPorPeriodo,
+        plazoPeriodos,
+        cuotaActual
+      ) => {
+        // Calcular en qué mes del año estamos
+        const mesDelAno = mesActual % 12;
+
+        // Calcular cuántas cuotas quedan en el año según la periodicidad
+        const cuotasEnUnAno = 12 / mesesPorPeriodo;
+        const cuotasRestantesAno = Math.ceil(
+          (12 - mesDelAno) / mesesPorPeriodo
+        );
+
+        // Calcular cuántas cuotas quedan en total
+        const cuotasTotales = plazoPeriodos - cuotaActual + 1;
+
+        // Retornar el mínimo entre las cuotas restantes del año y las totales
+        return Math.min(cuotasRestantesAno, cuotasTotales);
+      };
+
+      // Cálculo de MiPyme
+      let mipymeCuota = 0;
+      if (mipymePaymentOption === "Diferido") {
+        if (mesesTranscurridos % 12 === 0) {
+          // Calcular comisión anual sobre el saldo actual
+          const mipymeAnual = saldo * mipymeRate * (1 + IVA);
+
+          // Calcular cuántas cuotas quedan según la periodicidad
+          const cuotasRestantes = calcularCuotasMipymeRestantes(
+            mesesTranscurridos,
+            mesesPorPeriodo,
+            plazoPeriodos,
+            i
+          );
+
+          // Si quedan menos meses que un año completo, ajustar proporcionalmente
+          const factorProporcional = Math.min(
+            (12 - (mesesTranscurridos % 12)) / 12,
+            1
+          );
+
+          // Distribuir el monto ajustado en las cuotas restantes
+          mipymeCuota = (mipymeAnual * factorProporcional) / cuotasRestantes;
+        }
+      } else {
+        // Anticipado
+        if (mesesTranscurridos % 12 === 0) {
+          // Para pago anticipado, calcular sobre el saldo y ajustar si es el último año
+          const mesesRestantes =
+            plazoPeriodos * mesesPorPeriodo - mesesTranscurridos;
+          const factorProporcional = Math.min(mesesRestantes / 12, 1);
+          mipymeCuota = saldo * mipymeRate * (1 + IVA) * factorProporcional;
+        }
+      }
+
+      // Centrales (solo en primera cuota)
+      const centralesCuota = i === 1 ? calcularCostoCentrales(capital) : 0;
+
+      // Cuota total
+      const cuotaTotal =
+        cuotaBasica + fngCuota + seguroVidaCuota + mipymeCuota + centralesCuota;
+
+      // Actualizar saldo y meses transcurridos
+      saldo = Math.max(0, saldo - capitalCuota); // Evitar saldos negativos
+      mesesTranscurridos += mesesPorPeriodo;
+
+      amortizacion.push({
+        cuota: i,
+        cuotaConstante: Number(cuotaBasica.toFixed(2)),
+        capitalCuota: Number(capitalCuota.toFixed(2)),
+        interesCuota: Number(interesCuota.toFixed(2)),
+        fngCuota: Number(fngCuota.toFixed(2)),
+        mipymeCuota: Number(mipymeCuota.toFixed(2)),
+        seguroVidaCuota: Number(seguroVidaCuota.toFixed(2)),
+        centralesCuota: Number(centralesCuota.toFixed(2)),
+        cuotaTotal: Number(cuotaTotal.toFixed(2)),
+        saldoRestante: Number(saldo.toFixed(2)),
+      });
+    }
+
+    return amortizacion;
+  };
+
   const handleCalcular = () => {
     if (
       !monto ||
@@ -412,52 +444,22 @@ const App = () => {
       return;
     }
 
-    if (["EMP080", "EMP280"].includes(productoFNG) && !cedula) {
-      setError("❗ La cédula es requerida para este producto.");
-      return;
-    }
-
     const montoNum = parseFloat(monto);
-    if (!validateMonto(montoNum)) return;
+    const plazoNum = parseInt(plazo, 10);
 
     try {
-      const montoNum = parseFloat(monto);
-
-      console.log("Valores para cálculo:", {
-        monto: montoNum,
-        tasa: interestRate,
-        plazo: parseInt(plazo, 10),
-        modalidad: modalidadPago,
-        tipoCredito,
-        tipologia,
-      });
-
-      if (!interestRate) {
-        setError("❗ No se pudo determinar la tasa de interés.");
-        return;
-      }
-
       const amort = calcularAmortizacion(
         montoNum,
         interestRate,
-        parseInt(plazo, 10),
+        plazoNum,
         modalidadPago
       );
 
-      console.log("Amortización calculada:", amort);
-
-      if (!amort || amort.length === 0) {
-        setError("❗ No se pudo generar la tabla de amortización.");
-        return;
-      }
-
       setAmortizacion(amort);
-      setError("");
     } catch (err) {
-      console.error("Error al calcular amortización:", err);
-      setError(`❗ Error al calcular la tabla de amortización: ${err.message}`);
+      setError("Error al calcular la amortización");
     }
-  }; // ... (resto de funciones auxiliares y validaciones) ...
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-4">
@@ -681,6 +683,15 @@ const App = () => {
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <h2 className="text-lg font-semibold mb-3">💹 Tasas y Costos</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="text-sm">
+            <span className="font-semibold">Valores de cálculo:</span>
+            <p className="mt-1">
+              Monto: {parseFloat(monto).toLocaleString("es-CO")}
+            </p>
+            <p className="mt-1">Plazo: {plazo} períodos</p>
+            <p className="mt-1">Modalidad: {modalidadPago}</p>
+            <p className="mt-1">Tasa MV: {(interestRate * 100).toFixed(4)}%</p>
+          </div>
           <div className="text-sm">
             <span className="font-semibold">Tasa FNG:</span>
             <p className="mt-1">{(fngRate * 100).toFixed(2)}%</p>
