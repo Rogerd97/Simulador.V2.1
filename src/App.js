@@ -323,6 +323,26 @@ const App = () => {
     return amortizacion;
   };
 
+  // Agregar esta función junto a las otras funciones auxiliares
+  const ajustarTasaInteresPorPeriodicidad = (tasaMensual, modalidad) => {
+    const mesesPorPeriodo = {
+      Mensual: 1,
+      Bimestral: 2,
+      Trimestral: 3,
+      Cuatrimestral: 4,
+      Semestral: 6,
+      Anual: 12,
+    };
+
+    const periodoMeses = mesesPorPeriodo[modalidad] || 1;
+    // Ajustar la tasa mensual al periodo correspondiente
+    return Math.pow(1 + tasaMensual, periodoMeses) - 1;
+  };
+
+  const calcularSeguroVida = (saldo) => {
+    return (saldo / 1000) * SEGURO_VIDA_RATE;
+  };
+
   const handleCalcular = () => {
     if (
       !monto ||
