@@ -78,49 +78,88 @@ const App = () => {
   // Efecto para filtrar productos FNG según modalidad
   useEffect(() => {
     if (modalidadCredito) {
-      const productosFiltered = Object.entries(parametria.productosFNG)
-        .filter(([_, producto]) =>
-          producto.modalidadesPermitidas.includes(modalidadCredito)
-        )
-        .reduce((acc, [codigo, producto]) => {
-          acc[codigo] = producto;
-          return acc;
-        }, {});
+      if (
+        ["CONSUMO", "VEHICULO", "LEY_DE_VICTIMAS"].includes(modalidadCredito)
+      ) {
+        // Para estas modalidades, solo mostrar opción Sin Garantía
+        setProductosFNGFiltrados({
+          SIN_GARANTIA: {
+            nombre: "Sin Garantía",
+            comisionMensual: 0,
+            modalidadesPermitidas: ["CONSUMO", "VEHICULO", "LEY_DE_VICTIMAS"],
+            tipoComision: "UNICA_ANTICIPADA",
+            formaPago: "ANTICIPADO",
+            plazos: {
+              minimo: 1,
+              maximo: 120,
+            },
+            montos: parametria.modalidades[modalidadCredito].montos,
+            requiereIVA: false,
+          },
+        });
+      } else {
+        // Para otras modalidades, filtrar productos normalmente
+        const productosFiltered = Object.entries(parametria.productosFNG)
+          .filter(([_, producto]) =>
+            producto.modalidadesPermitidas.includes(modalidadCredito)
+          )
+          .reduce((acc, [codigo, producto]) => {
+            acc[codigo] = producto;
+            return acc;
+          }, {});
 
-      setProductosFNGFiltrados(productosFiltered);
-
-      if (productoFNG && !productosFiltered[productoFNG]) {
-        setProductoFNG("");
+        setProductosFNGFiltrados(productosFiltered);
       }
+
+      // Limpiar producto seleccionado al cambiar modalidad
+      setProductoFNG("");
     }
   }, [modalidadCredito]);
 
   // Efecto para cálculos generales
+  // Modificar el efecto que maneja los cálculos generales
   useEffect(() => {
     if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
-      // Determinar tipo de crédito según monto y tipología
-      const nuevoTipoCredito = determinarTipoCredito(montoNum);
-      setTipoCredito(nuevoTipoCredito);
 
+      // Validar monto primero
       if (!validateMonto(montoNum)) {
         return;
       }
 
-      // Obtener tasa de interés según el tipo de crédito
+      // Determinar tipo de crédito
+      const nuevoTipoCredito = determinarTipoCredito(montoNum);
+      setTipoCredito(nuevoTipoCredito);
+
+      // Obtener tasa de interés
       if (nuevoTipoCredito) {
+        console.log("Calculando tasa para:", {
+          monto: montoNum,
+          modalidad: modalidadCredito,
+          tipo: nuevoTipoCredito,
+          tipologia,
+        });
+
         const tasas = obtenerTasaInteres(
           montoNum,
           modalidadCredito,
           nuevoTipoCredito,
           tipologia
         );
+
         if (tasas) {
+          console.log("Tasas obtenidas:", tasas);
           setInterestRate(tasas.mv);
+        } else {
+          console.log("No se obtuvieron tasas");
+          setError(
+            "No se pudo determinar la tasa de interés para la combinación seleccionada"
+          );
+          return;
         }
       }
 
-      // Calcular comisión Mipyme
+      // Calcular comisión MiPyme
       const comisionMipyme = calcularComisionMipyme(montoNum);
       setMipymeRate(comisionMipyme);
 
@@ -134,8 +173,7 @@ const App = () => {
 
       setCostoCentrales(calcularCostoCentrales(montoNum));
     }
-  }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]);
-  // Funciones auxiliares
+  }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]); // Funciones auxiliares
 
   // Agregar esta función dentro del componente App, junto a las otras funciones auxiliares
   const validateMonto = (valor) => {
@@ -190,6 +228,10 @@ const App = () => {
     const producto = parametria.productosFNG[productoFNG];
     if (!producto) return 0;
 
+    if (productoFNG === "SIN_GARANTIA") {
+      return 0;
+    }
+
     if (["EMP320", "EMP300", "EMP200"].includes(productoFNG)) {
       return producto.comisionMensual;
     }
@@ -200,39 +242,57 @@ const App = () => {
   // Manejadores de eventos
   const handleProductoFNGChange = (e) => {
     const nuevoProducto = e.target.value;
-    const montoActual = parseFloat(monto);
 
-    // Validar montos si ya hay un monto ingresado
-    if (montoActual) {
-      const productoConfig = parametria.productosFNG[nuevoProducto];
-      if (productoConfig?.montos) {
-        if (
-          montoActual < productoConfig.montos.minimo ||
-          montoActual > productoConfig.montos.maximo
-        ) {
-          setError(
-            `❗ El monto ingresado no es válido para el producto ${nuevoProducto}`
-          );
-          return;
-        }
+    // Limpiar todos los errores primero
+    setError("");
+    setMontoError("");
+    setCedulaError("");
+
+    // Resetear valores si se deselecciona el producto
+    if (!nuevoProducto) {
+      setProductoFNG("");
+      setCedula("");
+      setFngRate(0);
+      return;
+    }
+
+    const montoActual = parseFloat(monto);
+    const producto = parametria.productosFNG[nuevoProducto];
+
+    // Actualizar el producto primero
+    setProductoFNG(nuevoProducto);
+
+    // Luego hacer las validaciones
+    if (montoActual && producto?.montos) {
+      if (
+        montoActual < producto.montos.minimo ||
+        montoActual > producto.montos.maximo
+      ) {
+        setMontoError(
+          `❌ El monto debe estar entre ${producto.montos.minimo.toLocaleString()} y ${producto.montos.maximo.toLocaleString()} COP para ${
+            producto.nombre
+          }`
+        );
       }
     }
 
-    setProductoFNG(nuevoProducto);
-    setCedula("");
-    setCedulaError("");
+    // Configurar forma de pago FNG
+    setFngPaymentOption(
+      ["EMP320", "EMP300", "EMP200"].includes(nuevoProducto)
+        ? "DIFERIDO"
+        : "ANTICIPADO"
+    );
 
-    const producto = parametria.productosFNG[nuevoProducto];
-    if (producto) {
-      if (["EMP320", "EMP300", "EMP200"].includes(nuevoProducto)) {
-        setFngPaymentOption("DIFERIDO");
-      } else {
-        setFngPaymentOption("ANTICIPADO");
-      }
+    // Validación de cédula
+    if (["EMP080", "EMP280"].includes(nuevoProducto)) {
+      setCedulaError("❌ Este producto requiere validación de cédula.");
+    }
 
-      if (["EMP080", "EMP280"].includes(nuevoProducto)) {
-        setCedulaError("❌ Este producto requiere validación de cédula.");
-      }
+    // Recalcular tasa FNG
+    if (monto && plazo && modalidadPago) {
+      const plazoMeses = parseInt(plazo, 10) * MESES_POR_PERIODO[modalidadPago];
+      const nuevaTasaFNG = calcularTasaFNG(montoActual, plazoMeses);
+      setFngRate(nuevaTasaFNG);
     }
   };
 
@@ -257,10 +317,45 @@ const App = () => {
   const handleMontoChange = (e) => {
     const valor = e.target.value;
     setMonto(valor);
+
+    // Limpiar errores previos
+    setMontoError("");
+    setError("");
+
     if (valor) {
-      validateMonto(parseFloat(valor));
-    } else {
-      setMontoError("");
+      const montoNum = parseFloat(valor);
+
+      // Validar monto
+      validateMonto(montoNum);
+
+      // Recalcular tipo de crédito y tasas
+      const nuevoTipoCredito = determinarTipoCredito(montoNum);
+      if (nuevoTipoCredito) {
+        setTipoCredito(nuevoTipoCredito);
+
+        // Actualizar tasa de interés
+        const tasas = obtenerTasaInteres(
+          montoNum,
+          modalidadCredito,
+          nuevoTipoCredito,
+          tipologia
+        );
+        if (tasas) {
+          setInterestRate(tasas.mv);
+        }
+
+        // Actualizar tasa MiPyme
+        const comisionMipyme = calcularComisionMipyme(montoNum);
+        setMipymeRate(comisionMipyme);
+
+        // Actualizar tasa FNG si hay producto seleccionado
+        if (productoFNG && plazo) {
+          const plazoMeses =
+            parseInt(plazo, 10) * MESES_POR_PERIODO[modalidadPago];
+          const nuevaTasaFNG = calcularTasaFNG(montoNum, plazoMeses);
+          setFngRate(nuevaTasaFNG);
+        }
+      }
     }
   };
 
@@ -335,30 +430,46 @@ const App = () => {
 
     // Función auxiliar para calcular comisión MiPyme
     const calcularMipymeCuota = (saldo, mesesTranscurridos, cuotaActual) => {
-      if (mesesTranscurridos % 12 === 0) {
-        const mipymeAnual = saldo * mipymeRate * (1 + IVA);
+      const esPrimerMesDelAno = mesesTranscurridos % 12 === 0;
 
-        if (mipymePaymentOption === "Anticipado") {
-          return mesesTranscurridos === 0
-            ? mipymeAnual
-            : saldo * mipymeRate * (1 + IVA);
-        } else {
-          // Diferido
-          // Calcular cuántas cuotas quedan en el año
-          const cuotasPorAno = 12 / mesesPorPeriodo;
+      if (mipymePaymentOption === "Diferido") {
+        if (esPrimerMesDelAno) {
+          // Calcular comisión anual sobre el saldo actual
+          const mipymeAnual = saldo * mipymeRate * (1 + IVA);
+
+          // Calcular cuotas restantes en el año actual
           const cuotasRestantesAno = Math.min(
-            cuotasPorAno,
+            Math.ceil(12 / mesesPorPeriodo),
             plazoPeriodos - cuotaActual + 1
           );
 
-          // Ajuste para el último año si es incompleto
+          // Ajustar para el último año si es incompleto
           const mesesRestantes =
             plazoPeriodos * mesesPorPeriodo - mesesTranscurridos;
           const factorProporcional = Math.min(mesesRestantes / 12, 1);
 
+          // Distribuir el monto del año actual
           return (mipymeAnual * factorProporcional) / cuotasRestantesAno;
+        } else if (
+          mesesTranscurridos <
+          Math.ceil(mesesTranscurridos / 12) * 12
+        ) {
+          // Continuar con las cuotas distribuidas del año en curso
+          const mipymeAnual =
+            (mesesTranscurridos < 12 ? capital : saldo) *
+            mipymeRate *
+            (1 + IVA);
+          const cuotasPorAno = 12 / mesesPorPeriodo;
+          return mipymeAnual / cuotasPorAno;
         }
+      } else if (mipymePaymentOption === "Anticipado" && esPrimerMesDelAno) {
+        // Cobro anticipado al inicio de cada año
+        const mesesRestantes =
+          plazoPeriodos * mesesPorPeriodo - mesesTranscurridos;
+        const factorProporcional = Math.min(mesesRestantes / 12, 1);
+        return saldo * mipymeRate * (1 + IVA) * factorProporcional;
       }
+
       return 0;
     };
 
@@ -629,7 +740,7 @@ const App = () => {
               type="number"
               className="w-full p-2 border rounded-md"
               value={monto}
-              onChange={(e) => setMonto(e.target.value)}
+              onChange={handleMontoChange}
               min="1000000"
               step="1000"
               placeholder="Ingrese el monto del crédito"
