@@ -127,31 +127,34 @@ const App = () => {
         return;
       }
 
+      console.log("Iniciando cálculos con:", {
+        monto: montoNum,
+        modalidad: modalidadCredito,
+        tipologia,
+      });
+
       // Determinar tipo de crédito
       const nuevoTipoCredito = determinarTipoCredito(montoNum);
+      console.log("Tipo de crédito determinado:", nuevoTipoCredito);
       setTipoCredito(nuevoTipoCredito);
 
       // Obtener tasa de interés
       if (nuevoTipoCredito) {
-        console.log("Calculando tasa para:", {
-          monto: montoNum,
-          modalidad: modalidadCredito,
-          tipo: nuevoTipoCredito,
-          tipologia,
-        });
-
-        const tasas = obtenerTasaInteres(
+        const tasaInteres = obtenerTasaInteres(
           montoNum,
           modalidadCredito,
           nuevoTipoCredito,
           tipologia
         );
 
-        if (tasas) {
-          console.log("Tasas obtenidas:", tasas);
-          setInterestRate(tasas.mv);
+        console.log("Tasa interés obtenida:", tasaInteres);
+
+        if (tasaInteres > 0) {
+          // Asegurarse que la tasa se guarde como número
+          setInterestRate(Number(tasaInteres));
+          setError(""); // Limpiar cualquier error previo
         } else {
-          console.log("No se obtuvieron tasas");
+          setInterestRate(0);
           setError(
             "No se pudo determinar la tasa de interés para la combinación seleccionada"
           );
@@ -168,16 +171,21 @@ const App = () => {
           plazo *
           (parametria.configuracionGeneral.modalidadesPago?.[modalidadPago] ||
             1);
-        setFngRate(calcularTasaFNG(montoNum, plazoMeses));
+        const tasaFNG = calcularTasaFNG(montoNum, plazoMeses);
+        console.log("Tasa FNG calculada:", tasaFNG);
+        setFngRate(tasaFNG);
       }
 
-      setCostoCentrales(calcularCostoCentrales(montoNum));
+      const costosCentrales = calcularCostoCentrales(montoNum);
+      console.log("Costos centrales calculados:", costosCentrales);
+      setCostoCentrales(costosCentrales);
     }
-  }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]); // Funciones auxiliares
+  }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]);
 
-  // Agregar esta función dentro del componente App, junto a las otras funciones auxiliares
   const validateMonto = (valor) => {
     if (!modalidadCredito) return false;
+
+    console.log("Validando monto:", valor);
 
     // Validación específica para productos FNG primero
     if (productoFNG) {
@@ -202,9 +210,11 @@ const App = () => {
       }
     }
 
-    // Luego validación por modalidad
+    // Validación por modalidad
     const modalidadConfig = parametria.modalidades[modalidadCredito];
     if (!modalidadConfig?.montos) return false;
+
+    console.log("Validando contra configuración:", modalidadConfig.montos);
 
     if (!valor || valor < modalidadConfig.montos.minimo) {
       setMontoError(
@@ -361,20 +371,39 @@ const App = () => {
 
   // Función para determinar tipo de crédito según monto
   const determinarTipoCredito = (monto) => {
-    if (!monto || !modalidadCredito || !tipologia) return "";
+    if (!monto || !modalidadCredito || !tipologia) {
+      console.log("Faltan datos para determinar tipo de crédito:", {
+        monto,
+        modalidadCredito,
+        tipologia,
+      });
+      return "";
+    }
 
     const SMLV = parametria.configuracionGeneral.salarioMinimo;
     const montoEnSMLV = monto / SMLV;
 
+    console.log("Calculando tipo de crédito:", {
+      monto,
+      SMLV,
+      montoEnSMLV,
+      modalidadCredito,
+      tipologia,
+    });
+
     switch (modalidadCredito) {
-      case "MICROCREDITO":
+      case "MICROCREDITO": {
+        let tipo;
         if (montoEnSMLV <= 6) {
-          return `POPULAR_${tipologia}`;
+          tipo = `POPULAR_${tipologia}`;
         } else if (montoEnSMLV <= 25) {
-          return `PRODUCTIVO_${tipologia}`;
+          tipo = `PRODUCTIVO_${tipologia}`;
         } else {
-          return "PRODUCTIVO_MAYOR_MONTO";
+          tipo = "PRODUCTIVO_MAYOR_MONTO";
         }
+        console.log("Tipo de microcrédito determinado:", tipo);
+        return tipo;
+      }
       case "COMERCIAL":
         return "COMERCIAL";
       case "CONSUMO":
@@ -410,6 +439,12 @@ const App = () => {
     plazoPeriodos,
     modalidad
   ) => {
+    console.log("Entrada calcularAmortizacion:", {
+      capital,
+      tasaMensual,
+      plazoPeriodos,
+      modalidad,
+    });
     // Validaciones iniciales
     if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
       setError("❗ Faltan datos requeridos para el cálculo");
@@ -477,6 +512,13 @@ const App = () => {
     const cuotaBasica =
       (capital * tasaPeriodica * Math.pow(1 + tasaPeriodica, plazoPeriodos)) /
       (Math.pow(1 + tasaPeriodica, plazoPeriodos) - 1);
+    // Agregar validación
+    if (isNaN(cuotaBasica) || !isFinite(cuotaBasica)) {
+      setError(
+        "❗ Error en el cálculo de la cuota. Verifique las tasas y plazos."
+      );
+      return [];
+    }
 
     let amortizacion = [];
     let saldo = capital;
@@ -536,6 +578,13 @@ const App = () => {
     return amortizacion;
   };
   const handleCalcular = () => {
+    console.log("Valores para cálculo:", {
+      montoNum: parseFloat(monto),
+      interestRate,
+      plazoNum: parseInt(plazo, 10),
+      modalidadPago,
+    });
+
     // Validar campos obligatorios
     if (
       !monto ||
