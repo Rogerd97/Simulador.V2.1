@@ -34,74 +34,64 @@ export const validarCedulaFondoEspecial = (cedula) => {
 
 // Función para obtener tasa de interés
 export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
-  console.log("Buscando tasa con parámetros:", {
-    monto,
-    modalidad,
-    tipoCredito,
-    zona,
-  });
-
+  // Validación inicial de la configuración
   const configuracionModalidad = parametria.tasasInteres[modalidad];
-  if (!configuracionModalidad?.rangos) return 0;
+  if (!configuracionModalidad?.rangos) {
+    console.log("No existe configuración para la modalidad:", modalidad);
+    return 0;
+  }
 
   // Buscar rango aplicable
   const rangoAplicable = configuracionModalidad.rangos.find((rango) => {
-    // Primero verificar el rango de monto
+    // Verificar rango de monto
     const dentroDeRango =
       monto >= rango.rango.desde && monto <= rango.rango.hasta;
+
     if (!dentroDeRango) return false;
 
-    console.log("Encontrado rango de monto válido:", rango);
-
-    // Verificar el tipo según la estructura
+    // Verificar tipo de crédito según la estructura
     if (Array.isArray(rango.tipos)) {
-      console.log(
-        "Verificando tipo en array:",
-        rango.tipos.includes(tipoCredito)
-      );
       return rango.tipos.includes(tipoCredito);
     }
 
     if (rango.tipo) {
-      console.log("Verificando tipo directo:", rango.tipo === tipoCredito);
       return rango.tipo === tipoCredito;
     }
 
     if (rango.tipos && typeof rango.tipos === "object") {
-      console.log("Verificando tipo en objeto:", tipoCredito in rango.tipos);
       return tipoCredito in rango.tipos;
     }
 
     return false;
   });
 
-  console.log("Rango aplicable encontrado:", rangoAplicable);
-
   if (!rangoAplicable) {
-    console.log("No se encontró rango aplicable");
+    console.log("No se encontró rango aplicable para:", { monto, tipoCredito });
     return 0;
   }
 
-  // Retornar la tasa según la estructura
+  // Obtener la tasa según la estructura encontrada
+  let tasaMV = 0;
+
+  // Caso 1: Tasa directa en el rango
   if (rangoAplicable.tasas?.mv !== undefined) {
-    console.log("Retornando tasa directa:", rangoAplicable.tasas.mv);
-    return rangoAplicable.tasas.mv;
+    tasaMV = rangoAplicable.tasas.mv;
+  }
+  // Caso 2: Tasa dentro de la estructura de tipos
+  else if (rangoAplicable.tipos && typeof rangoAplicable.tipos === "object") {
+    tasaMV = rangoAplicable.tipos[tipoCredito]?.tasas?.mv ?? 0;
   }
 
-  if (
-    rangoAplicable.tipos &&
-    typeof rangoAplicable.tipos === "object" &&
-    !Array.isArray(rangoAplicable.tipos)
-  ) {
-    console.log(
-      "Retornando tasa de objeto:",
-      rangoAplicable.tipos[tipoCredito]?.tasas?.mv
-    );
-    return rangoAplicable.tipos[tipoCredito]?.tasas?.mv || 0;
-  }
+  console.log("Tasa MV encontrada:", tasaMV, "para:", {
+    monto,
+    modalidad,
+    tipoCredito,
+    rango: rangoAplicable.rango,
+  });
 
-  return 0;
+  return tasaMV;
 };
+
 // Función para obtener forma de pago FNG
 export const obtenerFormaPagoFNG = (codigoFNG) => {
   if (!codigoFNG) return "DIFERIDO"; // valor por defecto
