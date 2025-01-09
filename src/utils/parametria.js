@@ -34,7 +34,7 @@ export const validarCedulaFondoEspecial = (cedula) => {
 
 // Función para obtener tasa de interés
 export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
-  console.log("Iniciando obtenerTasaInteres con:", {
+  console.log("Entrada obtenerTasaInteres:", {
     monto,
     modalidad,
     tipoCredito,
@@ -48,21 +48,29 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
   }
 
   const rangoAplicable = configuracionModalidad.rangos.find((rango) => {
+    // Verificar rango de monto
     const dentroDeRango =
       monto >= rango.rango.desde && monto <= rango.rango.hasta;
 
     if (!dentroDeRango) return false;
 
-    if (Array.isArray(rango.tipos)) {
-      return rango.tipos.includes(tipoCredito);
-    }
-
-    if (rango.tipo) {
+    // Para MICROCREDITO, manejar las diferentes estructuras
+    if (modalidad === "MICROCREDITO") {
+      // Caso 1: Array de tipos (rangos bajos)
+      if (Array.isArray(rango.tipos)) {
+        return rango.tipos.includes(tipoCredito);
+      }
+      // Caso 2: Tipo directo (rango alto)
+      if (rango.tipo) {
+        return rango.tipo === tipoCredito;
+      }
+      // Caso 3: Objeto de tipos (rangos medios)
+      if (rango.tipos && typeof rango.tipos === "object") {
+        return tipoCredito in rango.tipos;
+      }
+    } else {
+      // Para otras modalidades, verificar solo el tipo directo
       return rango.tipo === tipoCredito;
-    }
-
-    if (rango.tipos && typeof rango.tipos === "object") {
-      return tipoCredito in rango.tipos;
     }
 
     return false;
@@ -73,16 +81,27 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
     return 0;
   }
 
+  // Obtener la tasa según la estructura
   let tasaMV = 0;
 
-  if (rangoAplicable.tasas?.mv !== undefined) {
-    tasaMV = Number(rangoAplicable.tasas.mv);
-  } else if (rangoAplicable.tipos && typeof rangoAplicable.tipos === "object") {
-    const tasaObjeto = rangoAplicable.tipos[tipoCredito]?.tasas?.mv;
-    tasaMV = tasaObjeto !== undefined ? Number(tasaObjeto) : 0;
+  if (modalidad === "MICROCREDITO") {
+    // Caso 1: Tasa directa (para rango alto o rangos bajos)
+    if (rangoAplicable.tasas?.mv !== undefined) {
+      tasaMV = Number(rangoAplicable.tasas.mv);
+    }
+    // Caso 2: Tasa en estructura de tipos (para rangos medios)
+    else if (rangoAplicable.tipos && typeof rangoAplicable.tipos === "object") {
+      const tasaObjeto = rangoAplicable.tipos[tipoCredito]?.tasas?.mv;
+      tasaMV = tasaObjeto !== undefined ? Number(tasaObjeto) : 0;
+    }
+  } else {
+    // Para otras modalidades, tomar la tasa directamente
+    tasaMV = Number(rangoAplicable.tasas?.mv || 0);
   }
 
+  console.log("Rango aplicable encontrado:", rangoAplicable);
   console.log("Tasa MV calculada:", tasaMV, typeof tasaMV);
+
   return tasaMV;
 };
 
