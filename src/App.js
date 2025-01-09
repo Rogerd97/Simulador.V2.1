@@ -147,11 +147,12 @@ const App = () => {
           tipologia
         );
 
-        console.log("Tasa interés obtenida:", tasaInteres);
+        console.log("Tasa interés obtenida:", tasaInteres, typeof tasaInteres);
+        const tasaNumerica = Number(tasaInteres);
 
-        if (tasaInteres > 0) {
+        if (!isNaN(tasaNumerica) && tasaNumerica > 0) {
           // Asegurarse que la tasa se guarde como número
-          setInterestRate(Number(tasaInteres));
+          setInterestRate(tasaNumerica);
           setError(""); // Limpiar cualquier error previo
         } else {
           setInterestRate(0);
