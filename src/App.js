@@ -118,11 +118,11 @@ const App = () => {
 
   // Efecto para cálculos generales
   // Modificar el efecto que maneja los cálculos generales
+
   useEffect(() => {
     if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
 
-      // Validar monto primero
       if (!validateMonto(montoNum)) {
         return;
       }
@@ -133,12 +133,10 @@ const App = () => {
         tipologia,
       });
 
-      // Determinar tipo de crédito
       const nuevoTipoCredito = determinarTipoCredito(montoNum);
       console.log("Tipo de crédito determinado:", nuevoTipoCredito);
       setTipoCredito(nuevoTipoCredito);
 
-      // Obtener tasa de interés
       if (nuevoTipoCredito) {
         const tasaInteres = obtenerTasaInteres(
           montoNum,
@@ -147,12 +145,13 @@ const App = () => {
           tipologia
         );
 
-        console.log("Tasa interés obtenida:", tasaInteres);
+        console.log("Tasa interés obtenida:", tasaInteres, typeof tasaInteres);
 
-        if (tasaInteres > 0) {
-          // Asegurarse que la tasa se guarde como número
-          setInterestRate(Number(tasaInteres));
-          setError(""); // Limpiar cualquier error previo
+        // Convertir explícitamente a número y verificar que sea válido
+        const tasaNumerica = Number(tasaInteres);
+        if (!isNaN(tasaNumerica) && tasaNumerica > 0) {
+          setInterestRate(tasaNumerica);
+          setError("");
         } else {
           setInterestRate(0);
           setError(
@@ -182,6 +181,62 @@ const App = () => {
     }
   }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]);
 
+  const handleMontoChange = (e) => {
+    const valor = e.target.value;
+    setMonto(valor);
+
+    setMontoError("");
+    setError("");
+
+    if (valor) {
+      const montoNum = parseFloat(valor);
+
+      if (!validateMonto(montoNum)) {
+        return;
+      }
+
+      const nuevoTipoCredito = determinarTipoCredito(montoNum);
+      if (nuevoTipoCredito) {
+        setTipoCredito(nuevoTipoCredito);
+
+        const tasaInteres = obtenerTasaInteres(
+          montoNum,
+          modalidadCredito,
+          nuevoTipoCredito,
+          tipologia
+        );
+
+        console.log(
+          "Tasa calculada en handleMontoChange:",
+          tasaInteres,
+          typeof tasaInteres
+        );
+
+        // Asegurarnos de que la tasa sea un número válido
+        const tasaNumerica = Number(tasaInteres);
+        if (!isNaN(tasaNumerica) && tasaNumerica > 0) {
+          setInterestRate(tasaNumerica);
+        } else {
+          setInterestRate(0);
+          setError(
+            "No se pudo determinar la tasa de interés para el monto ingresado"
+          );
+        }
+
+        // Actualizar tasa MiPyme
+        const comisionMipyme = calcularComisionMipyme(montoNum);
+        setMipymeRate(comisionMipyme);
+
+        // Actualizar tasa FNG si hay producto seleccionado
+        if (productoFNG && plazo) {
+          const plazoMeses =
+            parseInt(plazo, 10) * MESES_POR_PERIODO[modalidadPago];
+          const nuevaTasaFNG = calcularTasaFNG(montoNum, plazoMeses);
+          setFngRate(nuevaTasaFNG);
+        }
+      }
+    }
+  };
   const validateMonto = (valor) => {
     if (!modalidadCredito) return false;
 
@@ -320,51 +375,6 @@ const App = () => {
         );
       } else {
         setCedulaError("");
-      }
-    }
-  };
-
-  const handleMontoChange = (e) => {
-    const valor = e.target.value;
-    setMonto(valor);
-
-    // Limpiar errores previos
-    setMontoError("");
-    setError("");
-
-    if (valor) {
-      const montoNum = parseFloat(valor);
-
-      // Validar monto
-      validateMonto(montoNum);
-
-      // Recalcular tipo de crédito y tasas
-      const nuevoTipoCredito = determinarTipoCredito(montoNum);
-      if (nuevoTipoCredito) {
-        setTipoCredito(nuevoTipoCredito);
-
-        // Actualizar tasa de interés
-        const tasas = obtenerTasaInteres(
-          montoNum,
-          modalidadCredito,
-          nuevoTipoCredito,
-          tipologia
-        );
-        if (tasas) {
-          setInterestRate(tasas.mv);
-        }
-
-        // Actualizar tasa MiPyme
-        const comisionMipyme = calcularComisionMipyme(montoNum);
-        setMipymeRate(comisionMipyme);
-
-        // Actualizar tasa FNG si hay producto seleccionado
-        if (productoFNG && plazo) {
-          const plazoMeses =
-            parseInt(plazo, 10) * MESES_POR_PERIODO[modalidadPago];
-          const nuevaTasaFNG = calcularTasaFNG(montoNum, plazoMeses);
-          setFngRate(nuevaTasaFNG);
-        }
       }
     }
   };
