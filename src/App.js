@@ -147,25 +147,21 @@ const App = () => {
           tipologia
         );
 
-        console.log(
-          "🔎 Tasa de interés obtenida:",
-          tasaInteres,
-          typeof tasaInteres
-        );
+        console.log("🔎 Tasa de interés obtenida:", tasaInteres);
 
-        // Verificar si la tasa obtenida es un número válido
+        // Verificar si la tasa tiene la propiedad mv
         if (
-          tasaInteres !== undefined &&
-          tasaInteres !== null &&
-          !isNaN(tasaInteres)
+          tasaInteres &&
+          typeof tasaInteres === "object" &&
+          !isNaN(Number(tasaInteres.mv))
         ) {
-          const tasaNumerica = Number(tasaInteres);
-          console.log("✅ Tasa numérica válida:", tasaNumerica);
+          const tasaNumerica = Number(tasaInteres.mv);
+          console.log("✅ Tasa MV válida:", tasaNumerica);
           setInterestRate(tasaNumerica);
-          setError(""); // Limpiar errores previos si todo está bien
+          setError(""); // Limpiar errores previos
         } else {
           console.warn(
-            "⚠️ No se pudo determinar la tasa de interés. Valor recibido:",
+            "⚠️ No se pudo determinar la tasa de interés. Objeto recibido:",
             tasaInteres
           );
           setInterestRate(0);
