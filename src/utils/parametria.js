@@ -37,9 +37,18 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
     zona,
   });
 
+  if (!parametria.tasasInteres || !parametria.tasasInteres[modalidad]) {
+    console.log(
+      "⚠️ Modalidad no encontrada en parametria.tasasInteres:",
+      modalidad
+    );
+    return 0;
+  }
+
   const configuracionModalidad = parametria.tasasInteres[modalidad];
+
   if (!configuracionModalidad?.rangos) {
-    console.log("No existe configuración para la modalidad:", modalidad);
+    console.log("⚠️ No hay rangos definidos para la modalidad:", modalidad);
     return 0;
   }
 
@@ -67,7 +76,10 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
   });
 
   if (!rangoAplicable) {
-    console.log("No se encontró rango aplicable para:", { monto, tipoCredito });
+    console.log("⚠️ No se encontró un rango aplicable para:", {
+      monto,
+      tipoCredito,
+    });
     return 0;
   }
 
@@ -76,7 +88,10 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
   if (modalidad === "MICROCREDITO") {
     if (rangoAplicable.tasas?.mv !== undefined) {
       tasaMV = Number(rangoAplicable.tasas.mv);
-    } else if (rangoAplicable.tipos && typeof rangoAplicable.tipos === "object") {
+    } else if (
+      rangoAplicable.tipos &&
+      typeof rangoAplicable.tipos === "object"
+    ) {
       const tasaObjeto = rangoAplicable.tipos[tipoCredito]?.tasas?.mv;
       tasaMV = tasaObjeto !== undefined ? Number(tasaObjeto) : 0;
     }
@@ -84,8 +99,15 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
     tasaMV = Number(rangoAplicable.tasas?.mv || 0);
   }
 
-  console.log("Rango aplicable encontrado:", rangoAplicable);
-  console.log("Tasa MV calculada:", tasaMV, typeof tasaMV);
+  if (isNaN(tasaMV)) {
+    console.log(
+      "❌ Error: La tasa calculada es NaN. Revisar la parametrización."
+    );
+    return 0;
+  }
+
+  console.log("✅ Rango aplicable encontrado:", rangoAplicable);
+  console.log("✅ Tasa MV calculada:", tasaMV);
 
   return tasaMV;
 };
@@ -106,7 +128,11 @@ export const obtenerFormaPagoFNG = (codigoFNG) => {
 
 // Función para calcular comisión MiPyme (Solo aplica a MICROCREDITO)
 export const calcularComisionMipyme = (monto, modalidad) => {
-  if (!monto || modalidad !== "MICROCREDITO" || !parametria.leyMipyme?.rangosSMLV) {
+  if (
+    !monto ||
+    modalidad !== "MICROCREDITO" ||
+    !parametria.leyMipyme?.rangosSMLV
+  ) {
     return 0;
   }
 
