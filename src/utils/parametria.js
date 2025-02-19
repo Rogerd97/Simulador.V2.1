@@ -1,7 +1,5 @@
 // src/utils/parametria.js
 
-// utils/parametria.js
-
 import parametria from "../data/parametria.json";
 
 export const getParametria = () => {
@@ -22,12 +20,10 @@ export const validarCedulaFondoEspecial = (cedula) => {
   const fechaActual = new Date();
   const fechaVigencia = new Date(cedulasPermitidas.vigenciaHasta);
 
-  // Validar vigencia
   if (fechaActual > fechaVigencia) {
     return { error: "La vigencia del fondo ha expirado" };
   }
 
-  // Validar si la cédula existe
   const fondoAsignado = cedulasPermitidas.cedulas[cedula];
   return fondoAsignado || { error: "Cédula no autorizada" };
 };
@@ -48,28 +44,22 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
   }
 
   const rangoAplicable = configuracionModalidad.rangos.find((rango) => {
-    // Verificar rango de monto
     const dentroDeRango =
       monto >= rango.rango.desde && monto <= rango.rango.hasta;
 
     if (!dentroDeRango) return false;
 
-    // Para MICROCREDITO, manejar las diferentes estructuras
     if (modalidad === "MICROCREDITO") {
-      // Caso 1: Array de tipos (rangos bajos)
       if (Array.isArray(rango.tipos)) {
         return rango.tipos.includes(tipoCredito);
       }
-      // Caso 2: Tipo directo (rango alto)
       if (rango.tipo) {
         return rango.tipo === tipoCredito;
       }
-      // Caso 3: Objeto de tipos (rangos medios)
       if (rango.tipos && typeof rango.tipos === "object") {
         return tipoCredito in rango.tipos;
       }
     } else {
-      // Para otras modalidades, verificar solo el tipo directo
       return rango.tipo === tipoCredito;
     }
 
@@ -81,21 +71,16 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
     return 0;
   }
 
-  // Obtener la tasa según la estructura
   let tasaMV = 0;
 
   if (modalidad === "MICROCREDITO") {
-    // Caso 1: Tasa directa (para rango alto o rangos bajos)
     if (rangoAplicable.tasas?.mv !== undefined) {
       tasaMV = Number(rangoAplicable.tasas.mv);
-    }
-    // Caso 2: Tasa en estructura de tipos (para rangos medios)
-    else if (rangoAplicable.tipos && typeof rangoAplicable.tipos === "object") {
+    } else if (rangoAplicable.tipos && typeof rangoAplicable.tipos === "object") {
       const tasaObjeto = rangoAplicable.tipos[tipoCredito]?.tasas?.mv;
       tasaMV = tasaObjeto !== undefined ? Number(tasaObjeto) : 0;
     }
   } else {
-    // Para otras modalidades, tomar la tasa directamente
     tasaMV = Number(rangoAplicable.tasas?.mv || 0);
   }
 
@@ -107,12 +92,11 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
 
 // Función para obtener forma de pago FNG
 export const obtenerFormaPagoFNG = (codigoFNG) => {
-  if (!codigoFNG) return "DIFERIDO"; // valor por defecto
+  if (!codigoFNG) return "DIFERIDO";
 
   const producto = parametria.productosFNG[codigoFNG];
   if (!producto) return "DIFERIDO";
 
-  // Para productos que calculan sobre saldo, siempre es diferido
   if (producto.tipoComision === "SALDO_MENSUAL") {
     return "DIFERIDO";
   }
@@ -120,9 +104,11 @@ export const obtenerFormaPagoFNG = (codigoFNG) => {
   return producto.formaPago || "DIFERIDO";
 };
 
-// Función para calcular comisión MiPyme
-export const calcularComisionMipyme = (monto) => {
-  if (!monto || !parametria.leyMipyme?.rangosSMLV) return 0;
+// Función para calcular comisión MiPyme (Solo aplica a MICROCREDITO)
+export const calcularComisionMipyme = (monto, modalidad) => {
+  if (!monto || modalidad !== "MICROCREDITO" || !parametria.leyMipyme?.rangosSMLV) {
+    return 0;
+  }
 
   const montoEnSMLV = calcularSMLV(monto);
   const rango = parametria.leyMipyme.rangosSMLV.find(
@@ -143,11 +129,10 @@ export const calcularCostoCentrales = (monto) => {
     (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
   );
 
-  // Retornar directamente el valor fijo según el rango
   return rango?.valorSMLV || 0;
 };
 
-// Función auxiliar para validar rangos de montos
+// Función para validar rangos de montos
 export const validarMontoRango = (monto, modalidad) => {
   if (!monto || !modalidad) return false;
 
@@ -182,7 +167,6 @@ export const validarPlazo = (plazo, modalidadPago, productoFNG) => {
     parametria.configuracionGeneral.modalidadesPago[modalidadPago];
   const plazoMeses = plazo * mesesPorPeriodo;
 
-  // Validar plazo mínimo general
   if (plazoMeses < parametria.configuracionGeneral.plazoMinimo) {
     return {
       valido: false,
@@ -190,7 +174,6 @@ export const validarPlazo = (plazo, modalidadPago, productoFNG) => {
     };
   }
 
-  // Validar plazos específicos del producto FNG
   if (productoFNG) {
     const producto = parametria.productosFNG[productoFNG];
     if (producto?.plazos) {
