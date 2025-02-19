@@ -147,19 +147,22 @@ const App = () => {
           tipologia
         );
 
-        console.log("Tasa interés obtenida:", tasaInteres, typeof tasaInteres);
+        console.log(
+          "🔎 Tasa de interés obtenida:",
+          tasaInteres,
+          typeof tasaInteres
+        );
 
-        // Asegurar que la tasa sea un número válido
-        const tasaNumerica = parseFloat(tasaInteres);
-        if (isNaN(tasaNumerica) || tasaNumerica <= 0) {
-          console.warn("⚠️ Error: No se pudo determinar la tasa de interés.");
+        // Verificar si la tasa obtenida es un número válido
+        if (tasaInteres && !isNaN(parseFloat(tasaInteres))) {
+          setInterestRate(parseFloat(tasaInteres));
+          setError(""); // Limpiar errores previos si todo está bien
+        } else {
+          console.warn("⚠️ No se pudo determinar la tasa de interés.");
           setInterestRate(0);
           setError(
             "No se pudo determinar la tasa de interés para la combinación seleccionada"
           );
-        } else {
-          setInterestRate(tasaNumerica);
-          setError(""); // Limpiar errores si todo está bien
         }
       }
 
