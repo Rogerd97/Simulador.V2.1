@@ -42,14 +42,14 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
       "⚠️ Modalidad no encontrada en parametria.tasasInteres:",
       modalidad
     );
-    return 0;
+    return { ea: 0, mv: 0 };
   }
 
   const configuracionModalidad = parametria.tasasInteres[modalidad];
 
   if (!configuracionModalidad?.rangos) {
     console.log("⚠️ No hay rangos definidos para la modalidad:", modalidad);
-    return 0;
+    return { ea: 0, mv: 0 };
   }
 
   const rangoAplicable = configuracionModalidad.rangos.find((rango) => {
@@ -80,36 +80,17 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
       monto,
       tipoCredito,
     });
-    return 0;
+    return { ea: 0, mv: 0 };
   }
 
-  let tasaMV = 0;
-
-  if (modalidad === "MICROCREDITO") {
-    if (rangoAplicable.tasas?.mv !== undefined) {
-      tasaMV = Number(rangoAplicable.tasas.mv);
-    } else if (
-      rangoAplicable.tipos &&
-      typeof rangoAplicable.tipos === "object"
-    ) {
-      const tasaObjeto = rangoAplicable.tipos[tipoCredito]?.tasas?.mv;
-      tasaMV = tasaObjeto !== undefined ? Number(tasaObjeto) : 0;
-    }
-  } else {
-    tasaMV = Number(rangoAplicable.tasas?.mv || 0);
-  }
-
-  if (isNaN(tasaMV)) {
-    console.log(
-      "❌ Error: La tasa calculada es NaN. Revisar la parametrización."
-    );
-    return 0;
-  }
-
+  // ✅ Extraemos la variable tasas correctamente
+  const tasas = rangoAplicable.tasas || { ea: 0, mv: 0 };
   console.log("✅ Rango aplicable encontrado:", rangoAplicable);
-  console.log("✅ Tasa MV calculada:", tasaMV);
+  console.log("✅ Tasa MV calculada:", tasas.mv);
+  console.log("✅ Tasa EA calculada:", tasas.ea);
 
-  return tasaMV ? { ea: tasas.ea || 0, mv: tasaMV } : { ea: 0, mv: 0 };
+  // ✅ Aseguramos que siempre se retorna un objeto con valores válidos
+  return { ea: tasas.ea || 0, mv: tasas.mv || 0 };
 };
 
 // Función para obtener forma de pago FNG
