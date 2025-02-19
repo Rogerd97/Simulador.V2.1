@@ -112,33 +112,29 @@ export const obtenerFormaPagoFNG = (codigoFNG) => {
 
 // Función para calcular comisión MiPyme (Solo aplica a MICROCREDITO)
 export const calcularComisionMipyme = (monto, modalidad) => {
+  console.log("🔹 Entrando a calcularComisionMipyme");
+  console.log("📌 Modalidad recibida:", modalidad);
+  console.log("📌 Monto recibido:", monto);
+
   if (!monto || !parametria.leyMipyme?.rangosSMLV) {
     console.warn("⚠️ No hay rangos de Ley MiPyme en la parametrización.");
     return 0;
   }
 
-  if (modalidad !== "MICROCREDITO") {
-    console.log("ℹ️ La Ley MiPyme solo aplica a MICROCREDITO.");
-    return 0;
+  if (!modalidad.startsWith("MICROCREDITO") && 
+    !modalidad.startsWith("POPULAR_") && 
+    !modalidad.startsWith("PRODUCTIVO_")) {
+  console.log("ℹ️ La Ley MiPyme solo aplica a MICROCREDITO y PRODUCTIVO/POPULAR.");
+  return 0;
   }
 
-  const SMLV = parametria.configuracionGeneral.salarioMinimo;
-
-  // 🔹 Agregar depuración aquí
-  console.log("🔎 Salario Mínimo Legal Vigente (SMLV):", SMLV);
-  console.log("📌 Monto ingresado:", monto);
-  console.log("📌 Monto convertido a SMLV:", monto / SMLV);
-
-  const montoEnSMLV = monto / SMLV;
-
+  // Convertir monto a SMLV
+  const montoEnSMLV = calcularSMLV(monto);
   console.log(`📌 Monto en SMLV: ${montoEnSMLV}`);
-  console.log(
-    "🔍 Rangos definidos en Ley MiPyme:",
-    JSON.stringify(parametria.leyMipyme.rangosSMLV, null, 2)
-  );
 
+  // Buscar el rango correspondiente
   const rango = parametria.leyMipyme.rangosSMLV.find(
-    (r) => montoEnSMLV > r.desde && montoEnSMLV <= r.hasta // Nota: usamos < en `hasta`
+    (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
   );
 
   if (!rango) {

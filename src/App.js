@@ -128,17 +128,17 @@ const App = () => {
     if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
       if (!validateMonto(montoNum)) return;
-
+  
       console.log("📌 Iniciando cálculos con:", {
         monto: montoNum,
         modalidad: modalidadCredito,
         tipologia,
       });
-
+  
       const nuevoTipoCredito = determinarTipoCredito(montoNum);
       console.log("📌 Tipo de crédito determinado:", nuevoTipoCredito);
       setTipoCredito(nuevoTipoCredito);
-
+  
       if (nuevoTipoCredito) {
         const tasaInteres = obtenerTasaInteres(
           montoNum,
@@ -149,20 +149,22 @@ const App = () => {
         console.log("📌 Tasa interés obtenida:", tasaInteres);
         setInterestRate(tasaInteres.mv || 0);
       }
-
+  
+      console.log("🔍 Calculando comisión MiPyme...");
+      console.log("📌 Modalidad actual:", modalidadCredito);
+      console.log("📌 Tipo de crédito actual:", nuevoTipoCredito);
+  
       const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
       console.log("📌 Comisión MiPyme obtenida en App.js:", comisionMipyme);
-
-      if (!isNaN(comisionMipyme) && comisionMipyme > 0) {
-        setMipymeRate(comisionMipyme);
-      } else {
-        console.warn(
-          "⚠️ Comisión MiPyme sigue en 0 o es NaN, revisa parametría."
-        );
+  
+      if (isNaN(comisionMipyme) || comisionMipyme === 0) {
+        console.error("⚠️ Comisión MiPyme sigue en 0 o es NaN, revisa parametría.");
       }
+  
+      setMipymeRate(comisionMipyme);
     }
   }, [monto, modalidadCredito, tipologia]);
-
+  
   const validateMonto = (valor) => {
     if (!modalidadCredito) return false;
 
