@@ -122,11 +122,23 @@ export const calcularComisionMipyme = (monto, modalidad) => {
     return 0;
   }
 
-  const montoEnSMLV = calcularSMLV(monto);
+  const SMLV = parametria.configuracionGeneral.salarioMinimo;
+
+  // 🔹 Agregar depuración aquí
+  console.log("🔎 Salario Mínimo Legal Vigente (SMLV):", SMLV);
+  console.log("📌 Monto ingresado:", monto);
+  console.log("📌 Monto convertido a SMLV:", monto / SMLV);
+
+  const montoEnSMLV = monto / SMLV;
+
   console.log(`📌 Monto en SMLV: ${montoEnSMLV}`);
+  console.log(
+    "🔍 Rangos definidos en Ley MiPyme:",
+    JSON.stringify(parametria.leyMipyme.rangosSMLV, null, 2)
+  );
 
   const rango = parametria.leyMipyme.rangosSMLV.find(
-    (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
+    (r) => montoEnSMLV >= r.desde && montoEnSMLV < r.hasta // Nota: usamos < en `hasta`
   );
 
   if (!rango) {

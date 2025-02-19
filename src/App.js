@@ -119,6 +119,12 @@ const App = () => {
   // Efecto para cálculos generales
   // Modificar el efecto que maneja los cálculos generales
   useEffect(() => {
+    if (mipymeRate !== 0) {
+      setMipymeRate(mipymeRate); // Forzar actualización si cambia
+    }
+  }, [mipymeRate]);
+
+  useEffect(() => {
     if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
       if (!validateMonto(montoNum)) return;
