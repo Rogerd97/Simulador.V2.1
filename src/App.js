@@ -122,23 +122,20 @@ const App = () => {
     if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
 
-      // Validar monto primero
       if (!validateMonto(montoNum)) {
         return;
       }
 
-      console.log("Iniciando cálculos con:", {
+      console.log("📌 Iniciando cálculos con:", {
         monto: montoNum,
         modalidad: modalidadCredito,
         tipologia,
       });
 
-      // Determinar tipo de crédito
       const nuevoTipoCredito = determinarTipoCredito(montoNum);
-      console.log("Tipo de crédito determinado:", nuevoTipoCredito);
+      console.log("📌 Tipo de crédito determinado:", nuevoTipoCredito);
       setTipoCredito(nuevoTipoCredito);
 
-      // Obtener tasa de interés
       if (nuevoTipoCredito) {
         const tasaInteres = obtenerTasaInteres(
           montoNum,
@@ -147,49 +144,15 @@ const App = () => {
           tipologia
         );
 
-        console.log("🔎 Tasa de interés obtenida:", tasaInteres);
-
-        // Verificar si la tasa tiene la propiedad mv
-        if (
-          tasaInteres &&
-          typeof tasaInteres === "object" &&
-          !isNaN(Number(tasaInteres.mv))
-        ) {
-          const tasaNumerica = Number(tasaInteres.mv);
-          console.log("✅ Tasa MV válida:", tasaNumerica);
-          setInterestRate(tasaNumerica);
-          setError(""); // Limpiar errores previos
-        } else {
-          console.warn(
-            "⚠️ No se pudo determinar la tasa de interés. Objeto recibido:",
-            tasaInteres
-          );
-          setInterestRate(0);
-          setError(
-            "No se pudo determinar la tasa de interés para la combinación seleccionada"
-          );
-        }
+        console.log("📌 Tasa interés obtenida:", tasaInteres);
+        setInterestRate(tasaInteres.mv || 0);
       }
 
-      // Calcular comisión MiPyme
       const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
+      console.log("📌 Comisión MiPyme obtenida:", comisionMipyme);
       setMipymeRate(comisionMipyme);
-
-      if (productoFNG) {
-        const plazoMeses =
-          plazo *
-          (parametria.configuracionGeneral.modalidadesPago?.[modalidadPago] ||
-            1);
-        const tasaFNG = calcularTasaFNG(montoNum, plazoMeses);
-        console.log("Tasa FNG calculada:", tasaFNG);
-        setFngRate(tasaFNG);
-      }
-
-      const costosCentrales = calcularCostoCentrales(montoNum);
-      console.log("Costos centrales calculados:", costosCentrales);
-      setCostoCentrales(costosCentrales);
     }
-  }, [monto, modalidadCredito, tipologia, productoFNG, plazo, modalidadPago]);
+  }, [monto, modalidadCredito, tipologia]);
 
   const validateMonto = (valor) => {
     if (!modalidadCredito) return false;
@@ -442,24 +405,19 @@ const App = () => {
     return Math.pow(1 + tasaMensual, periodoMeses) - 1;
   };
 
-  const calcularAmortizacion = (
-    capital,
-    tasaMensual,
-    plazoPeriodos,
-    modalidad
-  ) => {
+  const calcularAmortizacion = (capital, tasaMensual, plazoPeriodos, modalidad) => {
     console.log("📊 Entrada a calcularAmortizacion:", {
       capital,
       tasaMensual,
       plazoPeriodos,
       modalidad,
     });
-
+  
     if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
       setError("❗ Faltan datos requeridos para el cálculo");
       return [];
     }
-
+  
     const MESES_POR_PERIODO = {
       Mensual: 1,
       Bimestral: 2,
@@ -467,32 +425,32 @@ const App = () => {
       Semestral: 6,
       Anual: 12,
     };
-
+  
     const mesesPorPeriodo = MESES_POR_PERIODO[modalidad] || 1;
     const tasaPeriodica = Math.pow(1 + tasaMensual, mesesPorPeriodo) - 1;
-
+  
     if (isNaN(tasaPeriodica) || !isFinite(tasaPeriodica)) {
       console.error("❌ Error: La tasa periódica no es válida.");
       return [];
     }
-
+  
     const cuotaBasica =
       (capital * tasaPeriodica * Math.pow(1 + tasaPeriodica, plazoPeriodos)) /
       (Math.pow(1 + tasaPeriodica, plazoPeriodos) - 1);
-
+  
     if (isNaN(cuotaBasica) || !isFinite(cuotaBasica)) {
       console.error("❌ Error en el cálculo de la cuota.");
       return [];
     }
-
+  
     let saldo = capital;
     let amortizacion = [];
-
+  
     for (let i = 1; i <= plazoPeriodos; i++) {
       const interesCuota = saldo * tasaPeriodica;
       const capitalCuota = cuotaBasica - interesCuota;
       saldo = Math.max(0, saldo - capitalCuota);
-
+  
       amortizacion.push({
         cuota: i,
         cuotaConstante: Number(cuotaBasica.toFixed(2)),
@@ -502,11 +460,11 @@ const App = () => {
         saldoRestante: Number(saldo.toFixed(2)),
       });
     }
-
+  
     console.log("✅ Amortización generada:", amortizacion);
     return amortizacion;
   };
-
+  
   const handleCalcular = () => {
     console.log("Valores para cálculo:", {
       montoNum: parseFloat(monto),

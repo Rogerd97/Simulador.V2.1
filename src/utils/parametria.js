@@ -109,10 +109,13 @@ export const obtenerFormaPagoFNG = (codigoFNG) => {
 
 // Función para calcular comisión MiPyme (Solo aplica a MICROCREDITO)
 export const calcularComisionMipyme = (monto, modalidad) => {
-  if (!monto || !parametria.leyMipyme?.rangosSMLV) return 0;
+  if (!monto || !parametria.leyMipyme?.rangosSMLV) {
+    console.warn("⚠️ No hay rangos de Ley MiPyme en la parametrización.");
+    return 0;
+  }
 
-  // Solo aplicar si la modalidad es "MICROCREDITO"
   if (modalidad !== "MICROCREDITO") {
+    console.log("ℹ️ La Ley MiPyme solo aplica a MICROCREDITO.");
     return 0;
   }
 
