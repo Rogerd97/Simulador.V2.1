@@ -138,7 +138,7 @@ export const calcularComisionMipyme = (monto, modalidad) => {
   );
 
   const rango = parametria.leyMipyme.rangosSMLV.find(
-    (r) => montoEnSMLV >= r.desde && montoEnSMLV < r.hasta // Nota: usamos < en `hasta`
+    (r) => montoEnSMLV > r.desde && montoEnSMLV <= r.hasta // Nota: usamos < en `hasta`
   );
 
   if (!rango) {
