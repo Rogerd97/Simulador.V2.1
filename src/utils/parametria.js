@@ -128,11 +128,10 @@ export const obtenerFormaPagoFNG = (codigoFNG) => {
 
 // Función para calcular comisión MiPyme (Solo aplica a MICROCREDITO)
 export const calcularComisionMipyme = (monto, modalidad) => {
-  if (
-    !monto ||
-    modalidad !== "MICROCREDITO" ||
-    !parametria.leyMipyme?.rangosSMLV
-  ) {
+  if (!monto || !parametria.leyMipyme?.rangosSMLV) return 0;
+
+  // Solo aplicar si la modalidad es "MICROCREDITO"
+  if (modalidad !== "MICROCREDITO") {
     return 0;
   }
 

@@ -148,23 +148,23 @@ const App = () => {
         );
 
         console.log("Tasa interés obtenida:", tasaInteres, typeof tasaInteres);
-        const tasaNumerica = Number(tasaInteres);
 
-        if (!isNaN(tasaNumerica) && tasaNumerica > 0) {
-          // Asegurarse que la tasa se guarde como número
-          setInterestRate(tasaNumerica);
-          setError(""); // Limpiar cualquier error previo
-        } else {
+        // Asegurar que la tasa sea un número válido
+        const tasaNumerica = parseFloat(tasaInteres);
+        if (isNaN(tasaNumerica) || tasaNumerica <= 0) {
+          console.warn("⚠️ Error: No se pudo determinar la tasa de interés.");
           setInterestRate(0);
           setError(
             "No se pudo determinar la tasa de interés para la combinación seleccionada"
           );
-          return;
+        } else {
+          setInterestRate(tasaNumerica);
+          setError(""); // Limpiar errores si todo está bien
         }
       }
 
       // Calcular comisión MiPyme
-      const comisionMipyme = calcularComisionMipyme(montoNum);
+      const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
       setMipymeRate(comisionMipyme);
 
       if (productoFNG) {
@@ -896,7 +896,13 @@ const App = () => {
             </p>
             <p className="mt-1">Plazo: {plazo} períodos</p>
             <p className="mt-1">Modalidad: {modalidadPago}</p>
-            <p className="mt-1">Tasa MV: {(interestRate * 100).toFixed(4)}%</p>
+            <p className="mt-1">
+              Tasa MV:{" "}
+              {isNaN(interestRate)
+                ? "No disponible"
+                : (interestRate * 100).toFixed(4) + "%"}
+              %
+            </p>
           </div>
           <div className="text-sm">
             <span className="font-semibold">Tasa FNG:</span>
