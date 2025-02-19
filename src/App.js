@@ -411,14 +411,16 @@ const App = () => {
     tasaMensual,
     plazoPeriodos,
     modalidad,
-    mipymeRate
+    mipymeRate,
+    fngRate
   ) => {
     console.log("📊 Entrada a calcularAmortizacion:", {
       capital,
       tasaMensual,
       plazoPeriodos,
       modalidad,
-      mipymeRate, // Verificar que se pasa correctamente
+      mipymeRate,
+      fngRate,
     });
 
     if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
@@ -458,10 +460,27 @@ const App = () => {
       const interesCuota = saldo * tasaPeriodica;
       const capitalCuota = cuotaBasica - interesCuota;
 
-      // Agregar la comisión MiPyme distribuida en cada cuota
-      const mipymeCuota = capital * (mipymeRate / plazoPeriodos);
+      // 🔹 Evitar NaN en la comisión MiPyme
+      const mipymeCuota = !isNaN(mipymeRate)
+        ? capital * (mipymeRate / plazoPeriodos)
+        : 0;
 
-      const cuotaTotal = cuotaBasica + mipymeCuota;
+      // 🔹 Evitar NaN en FNG
+      const fngCuota = !isNaN(fngRate) ? saldo * fngRate : 0;
+
+      // 🔹 Calcular seguro de vida
+      const seguroVidaCuota = !isNaN(SEGURO_VIDA_RATE)
+        ? (saldo / 1000) * SEGURO_VIDA_RATE
+        : 0;
+
+      // 🔹 Calcular costo centrales (solo en la primera cuota)
+      const centralesCuota =
+        i === 1 ? (!isNaN(costoCentrales) ? costoCentrales : 0) : 0;
+
+      // 🔹 Calcular cuota total
+      const cuotaTotal =
+        cuotaBasica + mipymeCuota + fngCuota + seguroVidaCuota + centralesCuota;
+
       saldo = Math.max(0, saldo - capitalCuota);
 
       amortizacion.push({
@@ -469,7 +488,10 @@ const App = () => {
         cuotaConstante: Number(cuotaBasica.toFixed(2)),
         capitalCuota: Number(capitalCuota.toFixed(2)),
         interesCuota: Number(interesCuota.toFixed(2)),
-        mipymeCuota: Number(mipymeCuota.toFixed(2)), // 🔹 Agregar MiPyme
+        fngCuota: Number(fngCuota.toFixed(2)),
+        mipymeCuota: Number(mipymeCuota.toFixed(2)),
+        seguroVidaCuota: Number(seguroVidaCuota.toFixed(2)),
+        centralesCuota: Number(centralesCuota.toFixed(2)),
         cuotaTotal: Number(cuotaTotal.toFixed(2)),
         saldoRestante: Number(saldo.toFixed(2)),
       });
@@ -485,7 +507,8 @@ const App = () => {
       interestRate,
       plazoNum: parseInt(plazo, 10),
       modalidadPago,
-      mipymeRate, // Verificar si se pasa correctamente
+      mipymeRate,
+      fngRate,
     });
 
     if (!monto || !plazo || !modalidadPago || !departamento || !municipio) {
@@ -505,7 +528,8 @@ const App = () => {
         interestRate,
         parseInt(plazo, 10),
         modalidadPago,
-        mipymeRate // 🔹 Pasamos la tasa MiPyme
+        mipymeRate,
+        fngRate // 🔹 Pasamos FNG también
       );
 
       if (!amort || amort.length === 0) {

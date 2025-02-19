@@ -120,14 +120,14 @@ export const calcularComisionMipyme = (monto, modalidad) => {
   }
 
   const montoEnSMLV = calcularSMLV(monto);
+  console.log(`📌 Monto en SMLV: ${montoEnSMLV}`);
+
   const rango = parametria.leyMipyme.rangosSMLV.find(
     (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
   );
 
   if (!rango) {
-    console.warn(
-      "⚠️ No se encontró un rango de comisión MiPyme para este monto."
-    );
+    console.warn(`⚠️ No se encontró un rango para ${montoEnSMLV} SMLV.`);
     return 0;
   }
 
