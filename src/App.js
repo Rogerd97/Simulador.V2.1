@@ -146,12 +146,7 @@ const App = () => {
 
       const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
       console.log("📌 Comisión MiPyme obtenida en App.js:", comisionMipyme);
-
-      if (comisionMipyme > 0) {
-        setMipymeRate(comisionMipyme);
-      } else {
-        console.warn("⚠️ Comisión MiPyme sigue en 0, revisa parametría.");
-      }
+      setMipymeRate(comisionMipyme);
     }
   }, [monto, modalidadCredito, tipologia]);
 
@@ -428,20 +423,72 @@ const App = () => {
       return [];
     }
 
+    const MESES_POR_PERIODO = {
+      Mensual: 1,
+      Bimestral: 2,
+      Trimestral: 3,
+      Semestral: 6,
+      Anual: 12,
+    };
+
+    const mesesPorPeriodo = MESES_POR_PERIODO[modalidad] || 1;
+    const tasaPeriodica = Math.pow(1 + tasaMensual, mesesPorPeriodo) - 1;
+
+    if (isNaN(tasaPeriodica) || !isFinite(tasaPeriodica)) {
+      console.error("❌ Error: La tasa periódica no es válida.");
+      return [];
+    }
+
+    const cuotaBasica =
+      (capital * tasaPeriodica * Math.pow(1 + tasaPeriodica, plazoPeriodos)) /
+      (Math.pow(1 + tasaPeriodica, plazoPeriodos) - 1);
+
+    if (isNaN(cuotaBasica) || !isFinite(cuotaBasica)) {
+      console.error("❌ Error en el cálculo de la cuota.");
+      return [];
+    }
+
     let saldo = capital;
     let amortizacion = [];
 
     for (let i = 1; i <= plazoPeriodos; i++) {
-      const interesCuota = saldo * tasaMensual;
-      const capitalCuota = capital / plazoPeriodos;
+      const interesCuota = saldo * tasaPeriodica;
+      const capitalCuota = cuotaBasica - interesCuota;
 
+      // 🔹 Evitar NaN en la comisión MiPyme
       const mipymeCuota = !isNaN(mipymeRate)
         ? capital * (mipymeRate / plazoPeriodos)
         : 0;
 
+      // 🔹 Evitar NaN en FNG
+      const fngCuota = !isNaN(fngRate) ? saldo * fngRate : 0;
+
+      // 🔹 Calcular seguro de vida
+      const seguroVidaCuota = !isNaN(SEGURO_VIDA_RATE)
+        ? (saldo / 1000) * SEGURO_VIDA_RATE
+        : 0;
+
+      // 🔹 Calcular costo centrales (solo en la primera cuota)
+      const centralesCuota =
+        i === 1 ? (!isNaN(costoCentrales) ? costoCentrales : 0) : 0;
+
+      // 🔹 Calcular cuota total
+      const cuotaTotal =
+        cuotaBasica + mipymeCuota + fngCuota + seguroVidaCuota + centralesCuota;
+
+      saldo = Math.max(0, saldo - capitalCuota);
+
       amortizacion.push({
         cuota: i,
-        mipymeCuota: Number(mipymeCuota.toFixed(2)), // 🔹 Asegurar que no sea NaN
+        cuotaConstante: Number(cuotaBasica.toFixed(2)),
+        capitalCuota: Number(capitalCuota.toFixed(2)),
+        interesCuota: Number(interesCuota.toFixed(2)),
+        fngCuota: Number(fngCuota.toFixed(2)),
+        mipymeCuota: Number(mipymeCuota.toFixed(2)),
+        seguroVidaCuota: Number(seguroVidaCuota.toFixed(2)),
+        centralesCuota: Number(centralesCuota.toFixed(2)),
+        cuotaTotal: Number(cuotaTotal.toFixed(2)),
+        saldoRestante: Number(saldo.toFixed(2)),
       });
     }
 
