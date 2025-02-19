@@ -121,10 +121,7 @@ const App = () => {
   useEffect(() => {
     if (monto && modalidadCredito && tipologia) {
       const montoNum = parseFloat(monto);
-
-      if (!validateMonto(montoNum)) {
-        return;
-      }
+      if (!validateMonto(montoNum)) return;
 
       console.log("📌 Iniciando cálculos con:", {
         monto: montoNum,
@@ -143,14 +140,12 @@ const App = () => {
           nuevoTipoCredito,
           tipologia
         );
-
         console.log("📌 Tasa interés obtenida:", tasaInteres);
         setInterestRate(tasaInteres.mv || 0);
       }
 
-      // Verificar si la comisión MiPyme se está asignando correctamente
       const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
-      console.log("📌 Comisión MiPyme obtenida:", comisionMipyme);
+      console.log("📌 Comisión MiPyme obtenida en App.js:", comisionMipyme);
       setMipymeRate(comisionMipyme);
     }
   }, [monto, modalidadCredito, tipologia]);
@@ -507,7 +502,7 @@ const App = () => {
       interestRate,
       plazoNum: parseInt(plazo, 10),
       modalidadPago,
-      mipymeRate,
+      mipymeRate, // Agregamos log
       fngRate,
     });
 
@@ -528,8 +523,8 @@ const App = () => {
         interestRate,
         parseInt(plazo, 10),
         modalidadPago,
-        mipymeRate,
-        fngRate // 🔹 Pasamos FNG también
+        mipymeRate, // 🔹 Pasamos MiPyme
+        fngRate
       );
 
       if (!amort || amort.length === 0) {

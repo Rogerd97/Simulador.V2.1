@@ -9,7 +9,10 @@ export const getParametria = () => {
 // Función para calcular equivalencia en SMLV
 const calcularSMLV = (monto) => {
   const SMLV = parametria.configuracionGeneral.salarioMinimo;
-  return monto / SMLV;
+  console.log(`🔎 Salario Mínimo Legal Vigente (SMLV): ${SMLV}`);
+  const montoEnSMLV = monto / SMLV;
+  console.log(`📌 Monto convertido a SMLV: ${montoEnSMLV}`);
+  return montoEnSMLV;
 };
 
 // Función para validar cédula para fondos especiales
