@@ -117,7 +117,7 @@ export const calcularComisionMipyme = (monto, modalidad) => {
   console.log("📌 Monto recibido:", monto);
 
   if (!modalidad) {
-    console.warn("⚠️ Error: Modalidad es undefined o null.");
+    console.error("🚨 Error: Modalidad es undefined o null.");
     return 0;
   }
 
