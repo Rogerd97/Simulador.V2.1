@@ -154,11 +154,20 @@ const App = () => {
         );
 
         // Verificar si la tasa obtenida es un número válido
-        if (tasaInteres && !isNaN(parseFloat(tasaInteres))) {
-          setInterestRate(parseFloat(tasaInteres));
+        if (
+          tasaInteres !== undefined &&
+          tasaInteres !== null &&
+          !isNaN(tasaInteres)
+        ) {
+          const tasaNumerica = Number(tasaInteres);
+          console.log("✅ Tasa numérica válida:", tasaNumerica);
+          setInterestRate(tasaNumerica);
           setError(""); // Limpiar errores previos si todo está bien
         } else {
-          console.warn("⚠️ No se pudo determinar la tasa de interés.");
+          console.warn(
+            "⚠️ No se pudo determinar la tasa de interés. Valor recibido:",
+            tasaInteres
+          );
           setInterestRate(0);
           setError(
             "No se pudo determinar la tasa de interés para la combinación seleccionada"
