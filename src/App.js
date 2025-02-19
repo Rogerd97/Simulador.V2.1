@@ -146,7 +146,14 @@ const App = () => {
 
       const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
       console.log("📌 Comisión MiPyme obtenida en App.js:", comisionMipyme);
-      setMipymeRate(comisionMipyme);
+
+      if (!isNaN(comisionMipyme) && comisionMipyme > 0) {
+        setMipymeRate(comisionMipyme);
+      } else {
+        console.warn(
+          "⚠️ Comisión MiPyme sigue en 0 o es NaN, revisa parametría."
+        );
+      }
     }
   }, [monto, modalidadCredito, tipologia]);
 
