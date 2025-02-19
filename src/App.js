@@ -148,6 +148,7 @@ const App = () => {
         setInterestRate(tasaInteres.mv || 0);
       }
 
+      // Verificar si la comisión MiPyme se está asignando correctamente
       const comisionMipyme = calcularComisionMipyme(montoNum, modalidadCredito);
       console.log("📌 Comisión MiPyme obtenida:", comisionMipyme);
       setMipymeRate(comisionMipyme);
@@ -405,19 +406,26 @@ const App = () => {
     return Math.pow(1 + tasaMensual, periodoMeses) - 1;
   };
 
-  const calcularAmortizacion = (capital, tasaMensual, plazoPeriodos, modalidad) => {
+  const calcularAmortizacion = (
+    capital,
+    tasaMensual,
+    plazoPeriodos,
+    modalidad,
+    mipymeRate
+  ) => {
     console.log("📊 Entrada a calcularAmortizacion:", {
       capital,
       tasaMensual,
       plazoPeriodos,
       modalidad,
+      mipymeRate, // Verificar que se pasa correctamente
     });
-  
+
     if (!capital || !tasaMensual || !plazoPeriodos || !modalidad) {
       setError("❗ Faltan datos requeridos para el cálculo");
       return [];
     }
-  
+
     const MESES_POR_PERIODO = {
       Mensual: 1,
       Bimestral: 2,
@@ -425,73 +433,63 @@ const App = () => {
       Semestral: 6,
       Anual: 12,
     };
-  
+
     const mesesPorPeriodo = MESES_POR_PERIODO[modalidad] || 1;
     const tasaPeriodica = Math.pow(1 + tasaMensual, mesesPorPeriodo) - 1;
-  
+
     if (isNaN(tasaPeriodica) || !isFinite(tasaPeriodica)) {
       console.error("❌ Error: La tasa periódica no es válida.");
       return [];
     }
-  
+
     const cuotaBasica =
       (capital * tasaPeriodica * Math.pow(1 + tasaPeriodica, plazoPeriodos)) /
       (Math.pow(1 + tasaPeriodica, plazoPeriodos) - 1);
-  
+
     if (isNaN(cuotaBasica) || !isFinite(cuotaBasica)) {
       console.error("❌ Error en el cálculo de la cuota.");
       return [];
     }
-  
+
     let saldo = capital;
     let amortizacion = [];
-  
+
     for (let i = 1; i <= plazoPeriodos; i++) {
       const interesCuota = saldo * tasaPeriodica;
       const capitalCuota = cuotaBasica - interesCuota;
+
+      // Agregar la comisión MiPyme distribuida en cada cuota
+      const mipymeCuota = capital * (mipymeRate / plazoPeriodos);
+
+      const cuotaTotal = cuotaBasica + mipymeCuota;
       saldo = Math.max(0, saldo - capitalCuota);
-  
+
       amortizacion.push({
         cuota: i,
         cuotaConstante: Number(cuotaBasica.toFixed(2)),
         capitalCuota: Number(capitalCuota.toFixed(2)),
         interesCuota: Number(interesCuota.toFixed(2)),
-        cuotaTotal: Number(cuotaBasica.toFixed(2)),
+        mipymeCuota: Number(mipymeCuota.toFixed(2)), // 🔹 Agregar MiPyme
+        cuotaTotal: Number(cuotaTotal.toFixed(2)),
         saldoRestante: Number(saldo.toFixed(2)),
       });
     }
-  
+
     console.log("✅ Amortización generada:", amortizacion);
     return amortizacion;
   };
-  
+
   const handleCalcular = () => {
     console.log("Valores para cálculo:", {
       montoNum: parseFloat(monto),
       interestRate,
       plazoNum: parseInt(plazo, 10),
       modalidadPago,
+      mipymeRate, // Verificar si se pasa correctamente
     });
 
     if (!monto || !plazo || !modalidadPago || !departamento || !municipio) {
       setError("❗ Por favor completa todos los campos obligatorios.");
-      return;
-    }
-
-    if (["EMP080", "EMP280"].includes(productoFNG) && !cedula) {
-      setError("❗ La cédula es requerida para este producto.");
-      return;
-    }
-
-    const montoNum = parseFloat(monto);
-    const plazoNum = parseInt(plazo, 10);
-
-    if (isNaN(montoNum) || isNaN(plazoNum)) {
-      setError("❗ El monto y el plazo deben ser valores numéricos válidos.");
-      return;
-    }
-
-    if (!validateMonto(montoNum)) {
       return;
     }
 
@@ -503,10 +501,11 @@ const App = () => {
     try {
       console.log("📊 Iniciando cálculo de amortización...");
       const amort = calcularAmortizacion(
-        montoNum,
-        interestRate, // Aseguramos que se pasa correctamente
-        plazoNum,
-        modalidadPago
+        parseFloat(monto),
+        interestRate,
+        parseInt(plazo, 10),
+        modalidadPago,
+        mipymeRate // 🔹 Pasamos la tasa MiPyme
       );
 
       if (!amort || amort.length === 0) {
