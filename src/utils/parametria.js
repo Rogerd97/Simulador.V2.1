@@ -121,7 +121,15 @@ export const calcularComisionMipyme = (monto, modalidad) => {
     (r) => montoEnSMLV >= r.desde && montoEnSMLV <= r.hasta
   );
 
-  return rango?.comision || 0;
+  if (!rango) {
+    console.warn(
+      "⚠️ No se encontró un rango de comisión MiPyme para este monto."
+    );
+    return 0;
+  }
+
+  console.log("✅ Comisión MiPyme encontrada:", rango.comision);
+  return rango.comision || 0;
 };
 
 // Función para calcular costo de consulta a centrales

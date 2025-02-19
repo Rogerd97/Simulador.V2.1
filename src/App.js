@@ -594,20 +594,11 @@ const App = () => {
       modalidadPago,
     });
 
-    // Validar campos obligatorios
-    if (
-      !monto ||
-      !plazo ||
-      !modalidadPago ||
-      !productoFNG ||
-      !departamento ||
-      !municipio
-    ) {
+    if (!monto || !plazo || !modalidadPago || !departamento || !municipio) {
       setError("❗ Por favor completa todos los campos obligatorios.");
       return;
     }
 
-    // Validar cédula para productos específicos
     if (["EMP080", "EMP280"].includes(productoFNG) && !cedula) {
       setError("❗ La cédula es requerida para este producto.");
       return;
@@ -616,49 +607,25 @@ const App = () => {
     const montoNum = parseFloat(monto);
     const plazoNum = parseInt(plazo, 10);
 
-    // Validar que los números sean válidos
     if (isNaN(montoNum) || isNaN(plazoNum)) {
       setError("❗ El monto y el plazo deben ser valores numéricos válidos.");
       return;
     }
 
-    // Validar monto según modalidad y producto FNG
     if (!validateMonto(montoNum)) {
-      // No necesitamos setear error aquí porque validateMonto ya lo hace
       return;
     }
 
-    // Validar plazo mínimo y producto FNG
-    const plazoMeses = plazoNum * MESES_POR_PERIODO[modalidadPago];
-    const productoConfig = parametria.productosFNG[productoFNG];
-
-    if (productoConfig?.plazos) {
-      if (plazoMeses < productoConfig.plazos.minimo) {
-        setError(
-          `❗ El plazo mínimo para ${productoConfig.nombre} es de ${productoConfig.plazos.minimo} meses.`
-        );
-        return;
-      }
-      if (plazoMeses > productoConfig.plazos.maximo) {
-        setError(
-          `❗ El plazo máximo para ${productoConfig.nombre} es de ${productoConfig.plazos.maximo} meses.`
-        );
-        return;
-      }
-    }
-
-    // Validar que tengamos tasa de interés
-    if (!interestRate) {
-      setError(
-        "❗ No se pudo determinar la tasa de interés. Verifique los datos ingresados."
-      );
+    if (!interestRate || interestRate <= 0) {
+      setError("❗ No se pudo determinar la tasa de interés.");
       return;
     }
 
     try {
+      console.log("📊 Iniciando cálculo de amortización...");
       const amort = calcularAmortizacion(
         montoNum,
-        interestRate,
+        interestRate, // Aseguramos que se pasa correctamente
         plazoNum,
         modalidadPago
       );
@@ -668,13 +635,15 @@ const App = () => {
         return;
       }
 
+      console.log("✅ Tabla de amortización generada con éxito.");
       setAmortizacion(amort);
-      setError(""); // Limpiar cualquier error previo
+      setError("");
     } catch (err) {
-      console.error("Error en cálculo:", err);
-      setError(`❗ Error al calcular la amortización: ${err.message}`);
+      console.error("❌ Error al calcular la amortización:", err);
+      setError(`❗ Error en el cálculo: ${err.message}`);
     }
   };
+
   return (
     <div className="max-w-7xl mx-auto p-4">
       <div className="flex items-center gap-3 mb-6">
