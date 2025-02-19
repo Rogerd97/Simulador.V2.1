@@ -109,7 +109,7 @@ export const obtenerTasaInteres = (monto, modalidad, tipoCredito, zona) => {
   console.log("✅ Rango aplicable encontrado:", rangoAplicable);
   console.log("✅ Tasa MV calculada:", tasaMV);
 
-  return tasaMV ? { ea: tasaEA, mv: tasaMV } : { ea: 0, mv: 0 };
+  return tasaMV ? { ea: tasas.ea || 0, mv: tasaMV } : { ea: 0, mv: 0 };
 };
 
 // Función para obtener forma de pago FNG
